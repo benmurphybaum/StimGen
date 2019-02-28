@@ -1,22 +1,32 @@
-#StimGen python3
+#StimGen python
+
+#Must use python 2.7, not 3
+#pygame, pyglet, and psychopy
 
 #import widgets
 from PyQt5.QtWidgets import QApplication,QWidget,QMainWindow,QPushButton,QLineEdit,QGroupBox,QComboBox
 from PyQt5.QtWidgets import QLabel,QListWidget,QSpacerItem,QVBoxLayout,QGridLayout,QCheckBox
-from PyQt5 import QtCore,QtGui 
+from PyQt5 import QtCore,QtGui
+
+import math
+
+#import PsychoPy
+from psychopy import visual, clock, core
 
 class App(QMainWindow):
+
     def __init__(self):
-        super().__init__()
+        super(App,self).__init__()
 
         self.title = "StimGen 5.0"
         self.left = 10
         self.top = 10
         self.width = 650
         self.height = 780
-        
+
         #fonts
         bold = QtGui.QFont("Helvetica", 12,weight=QtGui.QFont.Normal)
+        boldLarge = QtGui.QFont("Helvetica", 14,weight=QtGui.QFont.Normal)
 
         self.setWindowTitle(self.title)
         self.setGeometry(self.left,self.top,self.width,self.height)
@@ -49,6 +59,20 @@ class App(QMainWindow):
         self.sequencesButton.setFont(bold)
         self.sequencesButton.clicked.connect(lambda: self.buttonProc("sequencesButton"))
 
+        self.runStimulus = QPushButton('Run',self)
+        self.runStimulus.move(10,720)
+        self.runStimulus.resize(75,30)
+        self.runStimulus.setFont(boldLarge)
+        self.runStimulus.setStyleSheet('QPushButton {background-color: rgba(150, 245, 150, 150)}')
+        self.runStimulus.clicked.connect(lambda: self.buttonProc("runStimulus"))
+
+        self.abortStimulus = QPushButton('Abort',self)
+        self.abortStimulus.move(90,720)
+        self.abortStimulus.resize(75,30)
+        self.abortStimulus.setFont(boldLarge)
+        self.abortStimulus.setStyleSheet('QPushButton {background-color: rgba(245, 150, 150, 150)}')
+        self.abortStimulus.clicked.connect(lambda: self.buttonProc("abortStimulus"))
+
         #Build Control Panels
         self.buildStimusList()
         self.buildDesignPanel()
@@ -57,10 +81,35 @@ class App(QMainWindow):
         self.buildPathPanel()
         self.buildGlobalsPanel()
 
+        self.setDefaults()
+
         self.show()
-    
+
+        #globals
+        global isOpen #stimulus window is closed
+        isOpen = 0
+
+    #Handles all variable entries
+    def variableProc(self,controlName):
+
+        #Need to check each variable for validity
+
+        if controlName == 'background':
+            bgnd = self.getBackground()
+            try:
+                win.color= [bgnd,bgnd,bgnd]
+
+                #Double flip, one to send new bgnd to buffer, then another to flip buffer to screen
+                win.flip()
+                win.flip()
+            except:
+                return
+        else:
+            return
+
     #Handles all button clicks
     def buttonProc(self,controlName):
+        global isOpen,abortStatus
 
         if  controlName == 'designButton':
             self.designPanel.show()
@@ -83,18 +132,253 @@ class App(QMainWindow):
         elif controlName == 'sequencesButton':
             self.designPanel.hide()
             self.designButton.setStyleSheet('QPushButton {background-color: rgba(255, 255, 255, 255)}');
-           
+
             self.maskPanel.hide()
             self.masksButton.setStyleSheet('QPushButton {background-color: rgba(255, 255, 255, 255)}');
 
             self.sequencePanel.show()
             self.sequencesButton.setStyleSheet('QPushButton {background-color: rgba(180, 245, 245, 255)}');
+        elif controlName == 'initSession':
+            #Open a stimulus window
+            self.initializeSession()
+        elif controlName == 'closeSession':
+            #Close the stimulus window
+            try:
+                win.close()
+                isOpen = 0 #window is open
+            except NameError:
+                return
+
+        elif controlName == 'runStimulus':
+            #Reset abort abortStatus
+            abortStatus = 0
+
+            #Run the stimulus
+            self.runStim()
+
+        elif controlName == 'abortStimulus':
+            self.abortStim()
         else:
             #default
             print('other')
 
-     #Stimulus Design Panel       
-    
+    #Converts 0-255 range to -1 to 1 range
+    def getBackground(self):
+        if len(self.background.text()) > 0:
+            val = float(self.background.text())
+            bgnd = (2 * val/255) - 1 #normalize from -1 to 1
+            return bgnd
+        else:
+            return
+
+    #Open a stimulus window
+    def initializeSession(self):
+        global win,isOpen,ifi
+
+        bgnd = self.getBackground()
+
+        win = visual.Window(
+            size=[1440, 900],
+            units="pix",
+            fullscr=True,
+            color=[bgnd, bgnd, bgnd],
+            screen = 0,
+            monitor = None
+        )
+
+        #Frame rate
+        ifi = 1/win.getActualFrameRate(10,100)
+
+        isOpen = 1 #window is open
+
+    #Fills out the stimulus parameters into a structure
+    def runStim(self):
+
+        #gets the stimulus parameters
+        stim = self.getStimDict()
+
+        #Timing
+        frames = int(round(stim['duration']/ifi)) #round to nearest integer
+
+        #Motion parameters
+        startX = stim['xOffset'] + stim['xPos'] + stim['startRad'] * math.cos(stim['angle'] * math.pi/180)
+        startY = stim['yOffset'] + stim['yPos'] + stim['startRad'] * math.sin(stim['angle'] * math.pi/180)
+
+        #Modulation parameters
+        if stim['modulationType'] != 'Static':
+            halfCycle = int(round((0.5/stim['modulationFreq'])/ifi)) #in number of frames
+            cycleCount = 1
+
+        #Intensity
+        firstIntensity,secondIntensity = self.getIntensity(stim)
+        #print(firstIntensity)
+        #print(secondIntensity)
+
+        #Define stimulus
+        if stim['objectType'] == 'Circle':
+            stimulus = visual.Circle(
+            win = win,
+            units = 'pix',
+            radius = stim['diameter']/2,
+            fillColor = [firstIntensity,firstIntensity,firstIntensity],
+            lineColor = [firstIntensity,firstIntensity,firstIntensity],
+            edges = 100,
+            pos = (stim['xOffset'] + stim['xPos'],stim['yOffset'] + stim['yPos'])
+            )
+
+        #elif stim['objectType'] == 'Rectangle':
+
+        #elif stim['objectType'] == 'Grating':
+
+        else:
+            print('other')
+
+        #Run the stimulus
+        try:
+            #Loop through repeats
+            for sweep in range(stim['repeats']):
+
+                #check for abort click
+                if abortStatus:
+                    return
+
+                #overall timer that is started before delay
+                totalTimer = core.Clock()
+
+                #delay
+                core.wait(stim['delay'])
+
+                #start timer
+                timer = core.Clock()
+
+# STIMULUS LOOP
+                for frame in range(frames):
+                #while timer.getTime() < stim['duration']:
+                    #print(modTimer.getTime())
+                    #check for abort click
+                    if abortStatus:
+                        win.flip()
+                        return
+
+                    #Update position for moving stimuli
+                    if stim['motionType'] == 'Drift':
+                        x = startX + stim['speed'] * timer.getTime() * math.cos(stim['angle'] * math.pi/180)
+                        y = startY + stim['speed'] * timer.getTime() * math.sin(stim['angle'] * math.pi/180)
+                        stimulus.pos = (x,y)
+
+                    #Update intensity for modulated stimuli
+                    if stim['modulationType'] == 'Square':
+                        #Flip the intensities between light/dark
+                        if frame == halfCycle * cycleCount:
+                            if (cycleCount % 2) == 0:
+                                stimulus.fillColor = [firstIntensity,firstIntensity,firstIntensity]
+                                stimulus.lineColor = [firstIntensity,firstIntensity,firstIntensity]
+                            else:
+                                stimulus.fillColor = [secondIntensity,secondIntensity,secondIntensity]
+                                stimulus.lineColor = [secondIntensity,secondIntensity,secondIntensity]
+                            cycleCount = cycleCount + 1
+
+                    #Draw stimulus to buffer window
+                    stimulus.draw() #redraws every frame
+                    #Flip the window
+                    win.flip()
+#################
+
+                #Flip the window to background again
+                win.flip()
+
+                #Wait for trial time to expire before starting next sweep
+                while totalTimer.getTime() < stim['trialTime']:
+                    win.flip()
+        except:
+            return
+
+    #Returns positive and negative contrast values around the background
+    def getIntensity(self,stim):
+        bgnd = stim['background']
+
+        if stim['contrastType'] == 'Michelson':
+            firstIntensity = bgnd + bgnd * (stim['contrast']/100)
+            secondIntensity = bgnd - bgnd * (stim['contrast']/100)
+
+            #all situations of out of bounds intensities
+            if firstIntensity > 255: #out of range, set to maximum
+                firstIntensity = 255
+                secondIntensity = bgnd - (255 - bgnd) #same amount below background as light is above background
+            elif secondIntensity < 0:
+                secondIntensity = 0 #out of range, set to minimum
+                firstIntensity = 2 * bgnd #set to 100% contrast
+
+                #reverse case, where firstIntensity is dark
+            elif secondIntensity > 255:
+                secondIntensity = 255
+                firstIntensity = bgnd - (255 - bgnd)
+            elif firstIntensity < 0:
+                secondIntensity = 0
+                secondIntensity = 2 * bgnd
+
+        elif stim['contrastType'] == 'Weber':
+            firstIntensity = bgnd * (stim['contrast']/100) + bgnd
+            secondIntensity = bgnd
+
+            #out of bounds intensities
+            if firstIntensity > 255:
+                firstIntensity = 255
+            elif firstIntensity < 0:
+                firstIntensity = 0
+
+        elif stim['contrastType'] == 'Intensity':
+            firstIntensity = stim['contrast']
+            secondIntensity = bgnd
+
+            #out of bounds intensities
+            if firstIntensity > 255:
+                firstIntensity = 255
+            elif firstIntensity < 0:
+                firstIntensity = 0
+
+        #Convert from 0-255 to -1 to 1 range
+        firstIntensity = (2 * firstIntensity/255) - 1
+        secondIntensity = (2 * secondIntensity/255) - 1
+
+        return (firstIntensity,secondIntensity)
+
+    #Aborts stimulus
+    def abortStim(self):
+        global abortStatus
+        abortStatus = 1
+
+    #Returns dictionary containing current stimulus parameters
+    def getStimDict(self):
+        stim = {
+        'background':float(self.background.text()),
+        'objectType':self.objectType.currentText(),
+        'coordinateType':self.coordinateType.currentText(),
+        'xOffset':float(self.xOffset.text()),
+        'yOffset':float(self.yOffset.text()),
+        'xPos':float(self.xPos.text()),
+        'yPos':float(self.yPos.text()),
+        'diameter':float(self.diameter.text()),
+        'length':float(self.length.text()),
+        'width':float(self.width.text()),
+        'spatialFreq':float(self.spatialFreq.text()),
+        'contrastType':self.contrastType.currentText(),
+        'contrast':float(self.contrast.text()),
+        'modulationType':self.modulationType.currentText(),
+        'modulationFreq':float(self.modulationFreq.text()),
+        'motionType':self.motionType.currentText(),
+        'speed':float(self.speed.text()),
+        'startRad':float(self.startRad.text()),
+        'angle':float(self.angle.text()),
+        'delay':float(self.delay.text()),
+        'duration':float(self.duration.text()),
+        'repeats':int(self.repeats.text()),
+        'trialTime':float(self.trialTime.text())
+
+        }
+
+        return stim
+
     #Design Panel
     def buildDesignPanel(self):
         left = 165
@@ -104,7 +388,7 @@ class App(QMainWindow):
 
         bold = QtGui.QFont("Helvetica", 14,weight=QtGui.QFont.Normal)
 
-    
+
         #Group box and designPanelLayout layout
         self.designPanel = QGroupBox(self)
         designPanelLayout = QGridLayout()
@@ -150,14 +434,14 @@ class App(QMainWindow):
         #Add blank slot to the right of the object type menu
         designPanelLayout.addWidget(self.blank2,6,3)
         #self.blank2.setStyleSheet("QLabel {background-color: blue;}")
-        
+
         #Coordinates
         self.coordinateLabel = QLabel('Coordinates')
         self.coordinateLabel.setFont(bold)
         self.coordinateType = QComboBox()
         self.coordinateType.addItem('Cartesian')
         self.coordinateType.addItem('Polar')
-        
+
         designPanelLayout.addWidget(self.coordinateLabel,0,9,1,2)
         designPanelLayout.addWidget(self.coordinateType,1,9,1,2)
 
@@ -177,7 +461,7 @@ class App(QMainWindow):
 
         #Y offset
         self.yPosLabel = QLabel('Y Offset')
-        self.yPosLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)     
+        self.yPosLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.yPos = QLineEdit()
         self.yPos.setAlignment(QtCore.Qt.AlignRight)
         self.yPos.setFixedWidth(40)
@@ -288,7 +572,7 @@ class App(QMainWindow):
         self.modulationFreqSeq = QComboBox(self)
         self.modulationFreqSeq.addItem('None')
         self.modulationFreqSeq.setFixedWidth(20)
-        
+
         designPanelLayout.addWidget(self.modulationTypeLabel,9,4,1,2)
         designPanelLayout.addWidget(self.modulationType,10,4,1,2)
         designPanelLayout.addWidget(self.modulationFreqLabel,11,4)
@@ -388,7 +672,7 @@ class App(QMainWindow):
         self.trialTime.setFixedWidth(40)
         self.trialTime.setAlignment(QtCore.Qt.AlignRight)
         self.trialTimeLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
-       
+
         designPanelLayout.addWidget(self.trialTimeLabel,16,0)
         designPanelLayout.addWidget(self.trialTime,16,1)
 
@@ -432,11 +716,7 @@ class App(QMainWindow):
         designPanelLayout.addWidget(self.triggerLabel,15,9,1,2)
         designPanelLayout.addWidget(self.trigger,16,9,1,2)
 
-
-
-        self.setDefaults()
-    
-    #Masks Panel  
+    #Masks Panel
     def buildMasksPanel(self):
         left = 165
         top = 300
@@ -458,7 +738,7 @@ class App(QMainWindow):
         #Mask Types
         self.maskTypeLabel = QLabel('Type')
         self.maskTypeLabel.setFont(bold)
-        
+
         self.maskType = QComboBox()
         self.maskType.addItem('None')
         self.maskType.addItem('Mask')
@@ -492,7 +772,7 @@ class App(QMainWindow):
         self.maskCoordinateType.setFixedWidth(106)
         self.maskCoordinateType.addItem('Cartesian')
         self.maskCoordinateType.addItem('Polar')
-        
+
         maskPanelLayout.addWidget(self.maskCoordinateLabel,0,4,1,2)
         maskPanelLayout.addWidget(self.maskCoordinateType,1,4,1,2)
 
@@ -514,7 +794,7 @@ class App(QMainWindow):
 
         #Mask Y offset
         self.maskYPosLabel = QLabel('Y Offset')
-        self.maskYPosLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)     
+        self.maskYPosLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
 
         self.maskYPos = QLineEdit()
         self.maskYPos.setAlignment(QtCore.Qt.AlignRight)
@@ -541,9 +821,8 @@ class App(QMainWindow):
 
         self.blank4 = QLabel('')
         maskPanelLayout.addWidget(self.blank4,0,1)
-        #self.blank4.setStyleSheet("QLabel {background-color: blue;}")
 
-    #Sequences  Panel 
+    #Sequences  Panel
     def buildSequencePanel(self):
         left = 165
         top = 300
@@ -663,7 +942,7 @@ class App(QMainWindow):
         self.removeSegment = QPushButton('Remove Segment')
         seqPanelLayout.addWidget(self.removeSegment,15,5,1,2)
         self.removeSegment.clicked.connect(lambda: self.buttonProc("removeSegment"))
-        
+
     #Path Panel
     def buildPathPanel(self):
         left = 10
@@ -749,7 +1028,7 @@ class App(QMainWindow):
         self.globalsLayout.addWidget(self.monitorLabel,1,0,1,2)
         self.monitorLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.globalsLayout.addWidget(self.monitor,1,2)
-        
+
         #PPM
         self.ppmLabel = QLabel('PPM')
         self.ppm = QLineEdit()
@@ -767,6 +1046,8 @@ class App(QMainWindow):
         self.globalsLayout.addWidget(self.backgroundLabel,3,0,1,2)
         self.backgroundLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.globalsLayout.addWidget(self.background,3,2)
+        self.background.textEdited.connect(lambda: self.variableProc('background'))
+
 
         #X Offset
         self.xOffsetLabel = QLabel('X Offset')
@@ -775,7 +1056,7 @@ class App(QMainWindow):
         self.xOffset.setAlignment(QtCore.Qt.AlignRight)
         self.globalsLayout.addWidget(self.xOffsetLabel,4,0,1,2)
         self.xOffsetLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
-        
+
         self.globalsLayout.addWidget(self.xOffset,4,2)
 
         #Y Offset
@@ -815,6 +1096,7 @@ class App(QMainWindow):
         self.gammaTableLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.globalsLayout.addWidget(self.gammaTable,8,2)
 
+    #Stimulus Bank
     def buildStimusList(self):
         left = 10
         top = 318
@@ -826,7 +1108,7 @@ class App(QMainWindow):
         #Stimulus Bank Label
         self.stimBankLabel  = QLabel('Stimulus Bank',self)
         self.stimBankLabel.move(left+30,top-55)
-        
+
         #Stimulus subfolder
         self.subFolder = QComboBox(self)
         self.subFolder.move(left,top-30)
@@ -838,11 +1120,34 @@ class App(QMainWindow):
         self.stimBank.move(left,top)
         self.stimBank.resize(width,height)
 
+    #Default settings
     def setDefaults(self):
-        controls = [
-            'diameter','length','width'
-        ]
+        self.ppm.setText('1')
+        self.background.setText('127')
+        self.xOffset.setText('0')
+        self.yOffset.setText('0')
+        self.syncFrames.setText('0')
 
+        self.xPos.setText('0')
+        self.yPos.setText('0')
+        self.maskXPos.setText('0')
+        self.maskYPos.setText('0')
+        self.diameter.setText('0')
+        self.length.setText('0')
+        self.width.setText('0')
+        self.spatialFreq.setText('0')
+        self.contrast.setText('0')
+        self.modulationFreq.setText('0')
+        self.repeats.setText('1')
+        self.speed.setText('0')
+        self.startRad.setText('0')
+        self.angle.setText('0')
+        self.delay.setText('0')
+        self.duration.setText('1')
+        self.trialTime.setText('0')
+
+
+#Start the application
 if __name__ == '__main__':
     #create instance of application
     StimGen = QApplication([])
@@ -855,25 +1160,3 @@ if __name__ == '__main__':
     #StimGen.setStyleSheet("QPushButton {background-color: blue;}")
     ex = App()
     StimGen.exec_()
-    
-   
-
-#Create a window
-#window = QWidget()
-
-#Create a layout with 2 buttons
-#circleLayout = QVBoxLayout()
-
-
-
-#circleLayout.addWidget(diamLabel)
-#circleLayout.addWidget(lengthLabel)
-##circleLayout.addWidget(spatialFreqLabel)
-
-#apply the layout to the window
-#window.setLayout(circleLayout)
-#window.resize(500,800)
-
-#show the window and execute application
-#window.show()
-#StimGen.exec_()
