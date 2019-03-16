@@ -1,4 +1,5 @@
 StimGen
+Ben Murphy-Baum, 2019
 
 StimGen is a python GUI for designing arbitrary visual stimuli (PsychoPy). It currently supports multiple stimulus objects, including spots, rectangles, gratings, annuli, rings, and snakes (rectangles expanding in the direction of motion), as well as some initial support for Motion Clouds (Ravello et al., 2019). Circular and rectangular masks/windows are also supported. 
 
