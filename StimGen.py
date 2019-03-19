@@ -502,9 +502,9 @@ class App(QMainWindow):
         bgnd = self.getBackground()
 
         win = visual.Window(
-            size=[500, 500],
+            #size=[500, 500],
             units="pix",
-            fullscr=False,
+            fullscr=True,
             color=[bgnd, bgnd, bgnd],
             screen = 0,
             monitor = None
@@ -751,8 +751,9 @@ class App(QMainWindow):
         #except:
         #    print('exception')
         #    return
-
-        self.saveCloud(motionCloud)
+        #for object in objectList:
+        #    if stim[object]['objectType'] == 'Cloud':
+        #        self.saveCloud(motionCloud)
 
     #Defines the stimulus textures
     def defineStimulus(self,runTime,ppm,xOffset,yOffset,i):
@@ -787,14 +788,18 @@ class App(QMainWindow):
             stimulus = visual.GratingStim(
             win = win,
             units = 'pix',
-            size = (800,800),
+            size = (2048,2048),
+            tex = 'sin',
+            texRes = 1024,
             sf = stim[i]['spatialFreq'] / (ppm * 1000),
             ori = stim[i]['orientation'],
-            phase = stim[i]['spatialPhase'],
+            #need to calculate the phase such that grating is centered around middle point of monitor
+            phase = stim[i]['spatialPhase'] * np.pi/180,
             color = [1,1,1],
             contrast = stim[i]['contrast']/100.0,
             pos = ((xOffset + stim[i]['xPos']) * ppm,(yOffset + stim[i]['yPos']) * ppm)
             )
+            print(stim[i]['spatialPhase'])
         elif stim[i]['objectType'] == 'Cloud':
 
             # define Fourier domain
@@ -2292,8 +2297,12 @@ class App(QMainWindow):
 
 #Start the application
 if __name__ == '__main__':
+
     #create instance of application
     StimGen = QApplication([])
+
+    #scaling will transfer to lower res monitors
+    StimGen.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True)
 
     #styles
     StimGen.setStyle('Fusion')
