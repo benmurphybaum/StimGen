@@ -2,11 +2,11 @@ StimGen
 
 coded by Ben Murphy-Baum, 2019
 
-StimGen is a python GUI for designing arbitrary visual stimuli (PsychoPy). It currently supports multiple stimulus objects, including spots, rectangles, gratings, annuli, rings, and snakes (rectangles expanding in the direction of motion), as well as some initial support for Motion Clouds (Ravello et al., 2019). Circular and rectangular masks/windows are also supported. 
+StimGen is a python GUI for designing arbitrary visual stimuli (PsychoPy). Stimulus design is based on stimulus 'objects', currently supports circular spots, rectangles, gratings, annuli, rings, and snakes (rectangles expanding in the direction of motion), as well as some initial support for Motion Clouds (Ravello et al., 2019). Circular and rectangular masks/windows are also supported. Multiple stimulus objects can be presented simultaneously with independent timing. Stimuli can be designed with no additional coding on the fly, and can be saved/recalled across experimental sessions.   
 
 Sequences:
 
-All stimulus variables can accept 'sequences', in which a variable has a different value for each subsequent presentation. i.e. if you want to present a moving spot 8 times, in 8 different directions, you could assign the sequence '0,45,90,135,180,225,270,315' to the 'Angle' variable. 
+All stimulus variables can accept 'sequences', in which a variable has a different value for each subsequent presentation. i.e. if you want to present a moving spot 8 times, in 8 different directions, you could create the sequence '0,45,90,135,180,225,270,315', and assign it to the 'Angle' variable. 
 
 Trajectories:
 
@@ -14,7 +14,7 @@ Moving objects can be defined in single linear trajectories or by arbitrary nonl
 
 Triggers:
 
-Supports input/output triggers through a parallel port. Some personal coding to define triggers is usually necessary.
+Supports input/output triggers through a parallel port. Some custom coding to define triggers is usually necessary.
 
 Gamma Correction:
 
