@@ -4,6 +4,7 @@
 #pygame, pyglet, and psychopy
 
 #import widgets
+<<<<<<< Updated upstream
 from PyQt5.QtWidgets import QApplication,QWidget,QMainWindow,QPushButton,QLineEdit,QGroupBox,QComboBox,QFrame
 from PyQt5.QtWidgets import QLabel,QListWidget,QListWidgetItem,QSpacerItem,QVBoxLayout,QGridLayout,QCheckBox,QInputDialog,QListView
 from PyQt5 import QtCore,QtGui
@@ -26,6 +27,47 @@ import math
 
 #Motion Clouds
 import MotionClouds as mc
+=======
+from PyQt5.QtWidgets import QApplication,QWidget,QMainWindow,QPushButton,QLineEdit,QGroupBox,QComboBox,QFrame,QAbstractItemView
+from PyQt5.QtWidgets import QLabel,QListWidget,QListWidgetItem,QSpacerItem,QVBoxLayout,QGridLayout,QCheckBox,QInputDialog,QListView,QFontDialog
+from PyQt5 import QtCore,QtGui
+
+#from PyQt5.QtGui import QIcon, QPixmap
+
+#timing libraries
+from time import sleep
+
+#for monitor specifications
+from win32api import GetSystemMetrics
+
+#for plotting data
+#import matplotlib.pyplot as plt
+
+#for browsing file explorer
+import tkinter
+from tkinter import filedialog,Tk
+
+#triggers
+import nidaqmx as ni
+
+#for saving and loading stimuli from disk
+import json
+import os
+import h5py
+import csv
+
+#for copying dictionaries
+import copy
+
+#PsychoPy
+from psychopy import visual, clock, core, monitors#, parallel
+
+import math, platform
+
+#Motion Clouds
+import MotionClouds as mc
+
+>>>>>>> Stashed changes
 import numpy as np
 
 #Build the GUI
@@ -33,67 +75,132 @@ class App(QMainWindow):
 
     #startup code
     def __init__(self):
+<<<<<<< Updated upstream
         global objectList, seqList, stim, seqAssign, seqDict
+=======
+        global objectList, seqList, trajList, maskList, stim, trajectoryStim, seqAssign, seqDict, trajDict, maskDict, basePath, stimPath, saveToPath, system
+        global scale_w,scale_h,device
+>>>>>>> Stashed changes
 
         super(App,self).__init__()
 
-        self.title = "StimGen 5.0"
-        self.left = 10
-        self.top = 10
-        self.width = 650
-        self.height = 780
+        #monitor scale factor
+        w = GetSystemMetrics(0)
+        h = GetSystemMetrics(1)
 
-        #fonts
-        bold = QtGui.QFont("Helvetica", 12,weight=QtGui.QFont.Normal)
-        boldLarge = QtGui.QFont("Helvetica", 14,weight=QtGui.QFont.Normal)
+
+        scale_h = 1
+        scale_w = 1
+        #coded on 2880x1800 retina display
+
+        #GUI dimensions
+        self.title = "StimGen 5.0"
+        self.left = 10 * scale_w
+        self.top = 10 * scale_h
+        self.width = 650 * scale_w
+        self.height = 780 * scale_h
+
+        #path to the StimGen.py file
+        basePath = 'C:/Users/jadob/Desktop/StimGenPy_WIN/StimGen/'
+        stimPath = basePath + 'stimuli/'
+        imagePath = basePath + 'images/'
+        saveToPath = 'C:/Users/jadob/Desktop/stimulusLog/'
+
+        #operating system
+        system = platform.system()
+
+        #set default fonts/sizes depending on operating system
+        if system == 'Windows':
+            #fonts
+            bold = QtGui.QFont("Roboto", 10,weight=QtGui.QFont.Normal)
+            boldLarge = QtGui.QFont("Roboto", 12,weight=QtGui.QFont.Normal)
+            titleFont = QtGui.QFont("Roboto Light",28,weight=QtGui.QFont.Light)
+            subTitleFont = QtGui.QFont("Roboto Light",10,weight=QtGui.QFont.Light)
+        elif system == 'Darwin':
+            #fonts
+            bold = QtGui.QFont("Helvetica", 12,weight=QtGui.QFont.Normal)
+            boldLarge = QtGui.QFont("Helvetica", 14,weight=QtGui.QFont.Normal)
+            titleFont = QtGui.QFont("Helvetica",32,weight=QtGui.QFont.Light)
+            subTitleFont = QtGui.QFont("Helvetica",12,weight=QtGui.QFont.ExtraLight)
 
         self.setWindowTitle(self.title)
         self.setGeometry(self.left,self.top,self.width,self.height)
 
+        #StimGen icon
+
+        self.iconLabel = QLabel('S T I M G E N',self)
+        # iconPath = imagePath + 'logo3.png'
+        # icon = QPixmap(iconPath)
+        # self.iconLabel.setPixmap(icon)
+        self.iconLabel.move(90 * scale_w,35 * scale_h)
+        self.iconLabel.setFixedSize(300 * scale_w,30 * scale_h)
+        self.iconLabel.setFont(titleFont)
+        self.iconLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignCenter)
+
+
+        # iconPath = imagePath + 'logo3.png'
+        # icon = QPixmap(iconPath)
+        # self.iconLabel.setPixmap(icon)
+        self.iconSubLabel = QLabel('A python environment for designing and presenting custom visual stimuli',self)
+        self.iconSubLabel.move(20 * scale_w,70 * scale_h)
+        self.iconSubLabel.setFixedSize(450 * scale_w,30 * scale_h)
+        self.iconSubLabel.setFont(subTitleFont)
+        self.iconSubLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignCenter)
+
         #Initialize/Close Session Controls
-        self.initSession = QPushButton('Initialize Session',self)
-        self.closeSession = QPushButton('Close Session',self)
-        self.initSession.move(100,110)
+        self.initSession = QPushButton('Initialize',self)
+        self.closeSession = QPushButton('Close',self)
+        self.initSession.move(115 * scale_w,110 * scale_h)
+        self.initSession.setFixedSize(100 * scale_w,30 * scale_h)
         self.initSession.setFont(bold)
-        self.closeSession.move(250,110)
+        self.closeSession.move(265 * scale_w,110 * scale_h)
+        self.closeSession.setFixedSize(100 * scale_w,30 * scale_h)
         self.closeSession.setFont(bold)
         self.initSession.clicked.connect(lambda: self.buttonProc("initSession"))
         self.closeSession.clicked.connect(lambda: self.buttonProc("closeSession"))
 
         #Design, Masks, Sequences Buttons
         self.designButton = QPushButton('Design',self)
-        self.designButton.move(215,280)
+        self.designButton.move(215 * scale_w,280 * scale_h)
+        self.designButton.setFixedSize(100 * scale_w,30 * scale_h)
         self.designButton.setFont(bold)
         self.designButton.setStyleSheet('QPushButton {background-color: rgba(180, 245, 245, 255)}');
         self.designButton.clicked.connect(lambda: self.buttonProc("designButton"))
 
         self.masksButton = QPushButton('Masks',self)
-        self.masksButton.move(360,280)
+        self.masksButton.move(360 * scale_w,280 * scale_h)
+        self.masksButton.setFixedSize(100 * scale_w,30 * scale_h)
         self.masksButton.setFont(bold)
         self.masksButton.clicked.connect(lambda: self.buttonProc("masksButton"))
 
         self.sequencesButton = QPushButton('Sequences',self)
-        self.sequencesButton.move(505,280)
+        self.sequencesButton.move(505 * scale_w,280 * scale_h)
+        self.sequencesButton.setFixedSize(100 * scale_w,30 * scale_h)
         self.sequencesButton.setFont(bold)
         self.sequencesButton.clicked.connect(lambda: self.buttonProc("sequencesButton"))
 
         self.runStimulus = QPushButton('Run',self)
-        self.runStimulus.move(10,720)
-        self.runStimulus.resize(75,30)
+        self.runStimulus.move(10 * scale_w,720 * scale_h)
+        self.runStimulus.resize(75 * scale_w,30 * scale_h)
         self.runStimulus.setFont(boldLarge)
         self.runStimulus.setStyleSheet('QPushButton {background-color: rgba(150, 245, 150, 150)}')
         self.runStimulus.clicked.connect(lambda: self.buttonProc("runStimulus"))
 
         self.abortStimulus = QPushButton('Abort',self)
-        self.abortStimulus.move(90,720)
-        self.abortStimulus.resize(75,30)
+        self.abortStimulus.move(90 * scale_w,720 * scale_h)
+        self.abortStimulus.resize(75 * scale_w,30 * scale_h)
         self.abortStimulus.setFont(boldLarge)
         self.abortStimulus.setStyleSheet('QPushButton {background-color: rgba(245, 150, 150, 150)}')
         self.abortStimulus.clicked.connect(lambda: self.buttonProc("abortStimulus"))
 
         self.sequenceMessage = QLabel('',self)
+<<<<<<< Updated upstream
         self.sequenceMessage.move(175,720)
         self.sequenceMessage.resize(300,60)
+=======
+        self.sequenceMessage.move(175 * scale_w,720 * scale_h)
+        self.sequenceMessage.resize(300 * scale_w,60 * scale_h)
+>>>>>>> Stashed changes
 
         #Object List
         objectList = ['Circle']
@@ -101,6 +208,15 @@ class App(QMainWindow):
         #Sequence list
         seqList = ['None']
 
+<<<<<<< Updated upstream
+=======
+        #Trajectory list
+        trajList = ['None']
+
+        #Mask list
+        maskList = []
+
+>>>>>>> Stashed changes
         #Build Control Panels
         self.buildStimusBank()
         self.buildDesignPanel()
@@ -109,7 +225,10 @@ class App(QMainWindow):
         self.buildPathPanel()
         self.buildGlobalsPanel()
 
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
         #Menus and Control settings
         self.setControlDict()
         self.setContextualMenus()
@@ -120,27 +239,50 @@ class App(QMainWindow):
 
         #Make first stimulus and sequence assignment dictionaries
         stim = {}
+<<<<<<< Updated upstream
         seqAssign = {} #holds sequence assignments for each control
         seqDict = {} #holds the actual sequence entries
+=======
+        trajectoryStim = {}
+
+        seqAssign = {} #holds sequence assignments for each control
+        seqDict = {} #holds the actual sequence entries
+        trajDict = {} #holds the trajectory entries
+        maskDict = {} #holds the mask entries
+>>>>>>> Stashed changes
 
         self.addStimDict()
 
         #get the stimulus files
         self.getStimulusBank()
 
+<<<<<<< Updated upstream
+=======
+        #get the stimulus images
+        self.getImageBank()
+
+>>>>>>> Stashed changes
         if self.stimBank.count() > 0:
             self.stimBank.setCurrentRow(0)
             self.loadStimulus()
 
+<<<<<<< Updated upstream
+=======
+        #show the GUI
+>>>>>>> Stashed changes
         self.show()
 
         #globals
-        global isOpen #stimulus window is closed
-        isOpen = 0
+        global isOpen
+        isOpen = 0 #stimulus window is closed
 
     #Handles all variable entries
     def variableProc(self,controlName,entry):
+<<<<<<< Updated upstream
         global stim, seqDict
+=======
+        global stim, seqDict, maskDict
+>>>>>>> Stashed changes
 
         #Need to check each variable for validity
         if controlName == 'background':
@@ -149,7 +291,9 @@ class App(QMainWindow):
                 win.color= [bgnd,bgnd,bgnd]
 
                 #Double flip, one to send new bgnd to buffer, then another to flip buffer to screen
+                #Flip the sync spot
                 win.flip()
+                self.drawSyncSpot(-1) #draw sync spot to dark if it's checked
                 win.flip()
             except:
                 return
@@ -158,6 +302,32 @@ class App(QMainWindow):
             name = item.text()
             entry = self.seqEntry.text()
             seqDict[name] = entry.split(",") #list
+<<<<<<< Updated upstream
+=======
+
+        elif controlName.find('mask') != -1:
+            #it's a mask variable, add to mask dictionary instead of stimulus dictionary
+            index = self.maskObjectListBox.currentRow()
+
+            if index == -1:
+                return
+
+            if self.isFloat(entry):
+                maskDict[index][controlName] = float(entry)   #some need to be float though
+            else:
+                if entry.isnumeric():
+                    maskDict[index][controlName] = int(entry)
+                else:
+                    control[controlName].setText('0')
+                    maskDict[index][controlName] = 0
+
+        elif controlName == 'apertureDiam':
+            if entry.isnumeric():
+                stim[0][controlName] = float(entry)
+            else:
+                control[controlName].setText('0')
+                stim[0][controlName] = 0.0
+>>>>>>> Stashed changes
         else:
             #all other variable controls
             #Assign variable entry to the stim dictionary for the selected object
@@ -165,11 +335,19 @@ class App(QMainWindow):
             if self.isFloat(entry):
                 stim[index][controlName] = float(entry)   #some need to be float though
             else:
+<<<<<<< Updated upstream
                 stim[index][controlName] = int(entry)
+=======
+                if entry.isnumeric():
+                    stim[index][controlName] = int(entry)
+                else:
+                    control[controlName].setText('0')
+                    stim[index][controlName] = 0
+>>>>>>> Stashed changes
 
     #Handles all button clicks
     def buttonProc(self,controlName):
-        global isOpen,abortStatus
+        global isOpen, abortStatus, saveToPath, stimPath, stimID
 
         if  controlName == 'designButton':
             self.designPanel.show()
@@ -180,6 +358,10 @@ class App(QMainWindow):
 
             self.sequencePanel.hide()
             self.sequencesButton.setStyleSheet('QPushButton {background-color: rgba(255, 255, 255, 255)}');
+
+            #Bug when masks are changed sometimes grating settings go back to circle settings
+            self.setContextualMenus() #ensures that the parameters have the correct settings.
+
         elif controlName == 'masksButton':
             self.designPanel.hide()
             self.designButton.setStyleSheet('QPushButton {background-color: rgba(255, 255, 255, 255)}');
@@ -189,6 +371,7 @@ class App(QMainWindow):
 
             self.sequencePanel.hide()
             self.sequencesButton.setStyleSheet('QPushButton {background-color: rgba(255, 255, 255, 255)}');
+
         elif controlName == 'sequencesButton':
             self.designPanel.hide()
             self.designButton.setStyleSheet('QPushButton {background-color: rgba(255, 255, 255, 255)}');
@@ -198,9 +381,11 @@ class App(QMainWindow):
 
             self.sequencePanel.show()
             self.sequencesButton.setStyleSheet('QPushButton {background-color: rgba(180, 245, 245, 255)}');
+
         elif controlName == 'initSession':
             #Open a stimulus window
             self.initializeSession()
+
         elif controlName == 'closeSession':
             #Close the stimulus window
             try:
@@ -213,8 +398,17 @@ class App(QMainWindow):
             #Reset abort abortStatus
             abortStatus = 0
 
+            if isOpen == 0:
+                return 0
+
             #Run the stimulus
             self.runStim()
+
+            #save data to stimulus log
+            if abortStatus == 0:
+                self.writeStimLog()
+                stimID = stimID + 1
+                self.stimID.setText(str(stimID))
 
         elif controlName == 'abortStimulus':
             self.abortStim()
@@ -231,17 +425,126 @@ class App(QMainWindow):
         elif controlName == 'removeSeq':
             self.removeSequence()
 
+<<<<<<< Updated upstream
         elif controlName == 'saveStim':
             self.saveStimulus()
         elif controlName == 'deleteStim':
             self.deleteStimulus()
+=======
+        elif controlName == 'addTraj':
+            self.addTrajectory()
+
+        elif controlName == 'removeTraj':
+            self.removeTrajectory()
+
+        elif controlName == 'appendSegment':
+            item = self.trajListBox.currentItem() #which trajectory
+            name = item.text()
+
+            trajDict[name]['angle'].append(self.trajAngle.text())
+            trajDict[name]['duration'].append(self.trajDuration.text())
+
+            self.updateTrajectory(name)
+
+        elif controlName == 'editSegment':
+            item = self.trajListBox.currentItem() #which trajectory
+            name = item.text()
+
+            #selected segment is the same for the duration list box
+            index = self.angleListBox.currentRow()
+
+            #edit the entry in place
+            trajDict[name]['angle'][index] = self.trajAngle.text()
+            trajDict[name]['duration'][index] = self.trajDuration.text()
+
+            self.updateTrajectory(name)
+
+        elif controlName == 'saveStim':
+            self.saveStimulus()
+
+        elif controlName == 'deleteStim':
+            self.deleteStimulus()
+
+        elif controlName == 'addMask':
+            self.addMaskObject()
+
+        elif controlName == 'removeMask':
+            self.removeMaskObject()
+
+        elif controlName == 'stimPathBrowse':
+
+            Tk().withdraw()
+            stimPath = tkinter.filedialog.askdirectory(initialdir = stimPath)
+            self.stimPath.setText(stimPath)
+
+        elif controlName == 'saveToPathBrowse':
+            if len(saveToPath) == 0:
+                startPath = basePath
+            else:
+                startPath = saveToPath
+            Tk().withdraw()
+            saveToPath = tkinter.filedialog.askdirectory(initialdir = startPath)
+            self.saveToPath.setText(saveToPath)
+
+>>>>>>> Stashed changes
         else:
             #default
             print('other')
 
+<<<<<<< Updated upstream
     #Handles all drop down menu selections
     def menuProc(self,controlName,selection):
         global objectList, stim, seqAssign
+=======
+    #writes the stimulus that was just run to the stimulus log on disk
+    def writeStimLog(self):
+
+        saveToPath = self.saveToPath.text()
+
+        #ensure valid path
+        if saveToPath.endswith('/') == False:
+            saveToPath = saveToPath + '/'
+
+        fileName = self.fileName.text()
+        if len(fileName) == 0:
+            return #only save if a file name has been provided
+        else:
+            path = saveToPath + fileName
+
+        #which stimulus is selected
+        stimulus = self.stimBank.currentItem()
+        stimName = stimulus.text()
+
+        #open and write dictionaries to the file
+        with open(path,'a+') as file:
+            writer = csv.writer(file)
+            writer.writerow(['***' + stimName + ':' + self.stimID.text()]) #Stimulus Name ***Stimulus:stimID
+
+            for object,_ in stim.iteritems():
+                writer.writerow(['ObjectNum:' + str(object)]) #write object number
+
+                for key,value in stim[object].iteritems():
+                    writer.writerow([key + ':' + str(value)])    #write stimulus parameters
+
+                writer.writerow([]) #blank spacer row
+
+            writer.writerow(['Sequences:']) #Sequences
+            for key,value in seqDict.iteritems():
+                writer.writerow([key + ':' + str(value)]) #write sequence definitions
+
+            writer.writerow(['Trajectories:']) #Trajectories
+            for traj,_ in trajDict.iteritems():
+                writer.writerow([traj + '|']) #write trajectory name
+                for key,value in trajDict[traj].iteritems():
+                    writer.writerow([key + ':' + str(value)]) #write trajectory definitions
+
+            writer.writerow([]) #blank spacer row at end
+            file.close()
+
+    #Handles all drop down menu selections
+    def menuProc(self,controlName,selection):
+        global objectList, stim, seqAssign, win, main
+>>>>>>> Stashed changes
 
         #Set contextual menus
         self.flipControls(controlName,selection)
@@ -255,15 +558,23 @@ class App(QMainWindow):
 
             #edit the listbox item for objects and masks
             self.objectListBox.item(index).setText(selection)
+<<<<<<< Updated upstream
             self.maskObjectListBox.item(index).setText(selection)
+=======
+>>>>>>> Stashed changes
 
             #Assign objectType box entry to the stim dictionary for the selected object
             index = self.objectListBox.currentRow()
             stim[index][controlName] = selection
 
         elif controlName.find('Seq') != -1:
+<<<<<<< Updated upstream
         #if it's a sequence menu
         #assign sequence name to the seq dictionary for that control
+=======
+            #if it's a sequence menu
+            #assign sequence name to the seq dictionary for that control
+>>>>>>> Stashed changes
 
             #which object?
             object = self.objectListBox.currentRow()
@@ -277,27 +588,220 @@ class App(QMainWindow):
 
             #display assigned sequences to the GUI
             self.displaySeqAssignments(object)
+<<<<<<< Updated upstream
+=======
+
+        elif controlName.find('mask') != -1: #is it a mask menu?
+            #which mask?
+            index = self.maskObjectListBox.currentRow()
+            if index == -1:
+                return
+            if controlName.find('Seq') != -1: #is it a mask sequence menu?
+                if selection != 'None':
+                    maskDict[index][controlName]['control'].setStyleSheet("background-color: rgba(150, 245, 150, 150)")
+                else:
+                    maskDict[index][controlName]['control'].setStyleSheet("background-color: white")
+                    maskDict[index][controlName]['control'].setStyleSheet("color: black")
+            else:
+                maskDict[index][controlName] = selection
+                #set currently selected mask object to the mask type
+                self.maskObjectListBox.item(index).setText(selection)
+
+        elif controlName == 'apertureStatus':
+            stim[0][controlName] = selection
+
+        elif controlName == 'gammaTable':
+            if isOpen:
+                #win.gamma = float(selection)
+                mon = monitors.Monitor('Generic Non-PnP Monitor')
+                mon.setGamma(float(self.gammaTable.currentText()))
+                win.flip()
+
+>>>>>>> Stashed changes
         else:
             #add parameter to stim dictionary for all other drop down menus (motionType,coordinateType, etc...)
             stim[index][controlName] = selection
 
     #Handles all of the list box selections
     def listProc(self,controlName,index):
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
         if controlName == 'objectListBox':
             self.setObjectParameters(index)
 
             #display assigned sequences to the GUI
             self.displaySeqAssignments(index)
 
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
         elif controlName == 'seqListBox':
             name = seqList[index + 1]
             entry = (seqDict[name])
             entry = ','.join(entry)
             self.seqEntry.setText(entry)
 
+<<<<<<< Updated upstream
         elif controlName == 'stimBank':
             self.loadStimulus()
 
+=======
+        elif controlName == 'trajListBox':
+            name = trajList[index + 1]
+            self.updateTrajectory(name)
+
+        elif controlName == 'angleListBox':
+            self.durationListBox.setCurrentRow(index)
+
+            whichTrajectory = self.trajListBox.currentRow()
+            name = trajList[whichTrajectory + 1]
+
+            if(name == 'None'):
+                return
+
+            self.trajAngle.setText(trajDict[name]['angle'][index])
+            self.trajDuration.setText(trajDict[name]['duration'][index])
+
+        elif controlName == 'durationListBox':
+            self.angleListBox.setCurrentRow(index)
+
+            whichTrajectory = self.trajListBox.currentRow()
+            name = trajList[whichTrajectory + 1]
+            if(name == 'None'):
+                return
+
+            self.trajAngle.setText(trajDict[name]['angle'][index])
+            self.trajDuration.setText(trajDict[name]['duration'][index])
+
+        elif controlName == 'stimBank':
+            self.loadStimulus()
+
+        elif controlName == 'maskObjectListBox':
+            self.maskObjectType.setCurrentText(maskDict[index]['maskType'])
+            self.maskDiameter.setText(str(maskDict[index]['maskDiameter']))
+            self.maskCoordinateType.setCurrentText(maskDict[index]['maskCoordinateType'])
+            self.maskYPos.setText(str(maskDict[index]['maskYPos']))
+            self.maskXPos.setText(str(maskDict[index]['maskXPos']))
+
+    #handles all checkboxes
+    def checkProc(self,controlName,isChecked):
+        ppm = float(self.ppm.text())
+
+        if controlName == 'syncSpot':
+            #sync spot
+            if isChecked:
+                syncSpot = visual.Rect(
+                win = win,
+                units = 'pix',
+                width = 80 * ppm,
+                height = 80 * ppm,
+                fillColor = [1,1,1],
+                lineColor = [1,1,1],
+                contrast = -1,
+                pos = (532-40,-404+40)
+                )
+
+                if isOpen == 1:
+                    syncSpot.draw()
+                    win.flip()
+            else:
+                if isOpen == 1:
+                    win.flip()
+
+    #removes a mask from the stimulus
+    def removeMaskObject(self):
+        global maskList,maskDict
+
+        #can't delete past 0
+        numMasks = len(maskList)
+        if numMasks == 0:
+            return
+
+        #selected mask
+        index = self.maskObjectListBox.currentRow()
+
+        #delete mask from the list box
+        self.maskObjectListBox.takeItem(index)
+
+        #remove object from the stimulus object list
+        del maskList[index]
+
+        #remove the mask from the mask dictionary
+        if index == numMasks - 1: #if its the last object, no dictionary shifting is necessary
+            maskDict.pop(index,None)
+        else:
+            numMasks = len(maskList) #new number of masks after deleting one of them
+
+            #shift dictionary indices (for object indices 0,1,2 , deleting object 1 results in 0,1 dictionary indices)
+            for object in range(index,numMasks):
+                maskDict[object] = maskDict[object+1]
+
+            #now delete final dictionary entries
+            maskDict.pop(numMasks,None)
+
+    #adds a new mask to the stimulus
+    def addMaskObject(self):
+        global maskList, maskDict
+
+        #get mask type, add to the mask list box
+        type = self.maskObjectType.currentText()
+        maskList.append(type)
+
+        size = len(maskList)
+
+        self.maskObjectListBox.addItem('Circle') #always start with a circle
+        self.maskObjectListBox.setCurrentRow(size-1)
+        self.maskObjectListBox.setSelectionMode(1)
+
+        self.maskDiameter.setText('0')
+        self.maskYPos.setText('0')
+        self.maskXPos.setText('0')
+        self.maskDiameterSeq.setCurrentIndex(0)
+        self.maskXPosSeq.setCurrentIndex(0)
+        self.maskYPosSeq.setCurrentIndex(0)
+        self.maskPolarRadius.setText('0')
+        self.maskPolarAngle.setText('0')
+
+        #add the mask to the stimulus dictionary
+        maskDict[size-1] = {
+        'maskType': type,
+        'maskDiameter': 0,
+        'maskCoordinateType':self.maskCoordinateType.currentText(),
+        'maskXPos': 0,
+        'maskYPos': 0,
+        'maskPolarRadius':0,
+        'maskPolarAngle':0,
+        'maskDiameterSeq':{
+            'control':self.maskDiameterSeq,
+            'parent':'maskDiameter',
+            'sequence':'None'
+            },
+        'maskXPosSeq':{
+            'control':self.maskXPosSeq,
+            'parent':'maskXPos',
+            'sequence':'None'
+            },
+        'maskYPosSeq':{
+            'control':self.maskYPosSeq,
+            'parent':'maskYPos',
+            'sequence':'None'
+            },
+        'maskPolarRadiusSeq':{
+            'control':self.maskPolarRadiusSeq,
+            'parent':'maskPolarRadius',
+            'sequence':'None'
+            },
+        'maskPolarAngleSeq':{
+            'control':self.maskPolarAngleSeq,
+            'parent':'maskPolarAngle',
+            'sequence':'None'
+            }
+        }
+
+>>>>>>> Stashed changes
     #adds a new sequence
     def addSequence(self):
         global seqList, seqDict
@@ -324,23 +828,165 @@ class App(QMainWindow):
         for key,_ in seqAssign[0].iteritems():
             control[key].addItem(name)
 
+<<<<<<< Updated upstream
+=======
+    #Deletes the selected sequence
+    def removeSequence(self):
+        global seqList, seqDict
+
+        #prevent deleting 'None'
+        numSequences = len(seqList)
+        if numSequences == 1:
+            return
+
+        #selected item and its index
+        item = self.seqListBox.currentItem()
+        index = self.seqListBox.currentRow()
+
+        theSequence = item.text()
+        seqDict.pop(theSequence)
+
+        #delete sequence from the list box
+        self.seqListBox.takeItem(self.seqListBox.row(item))
+
+        #remove from seqList and seqDict
+        del seqList[index+1]
+
+        #update sequence assignment menus
+        for object,_ in seqAssign.iteritems():
+            for key,_ in seqAssign[object].iteritems():
+                seqMenu = seqAssign[object][key]['control']
+                seqMenu.removeItem(index + 1) #add one to avoid deleting 'None'
+
+                #if that sequence was a part of an assignment, change assignment to 'None'
+                if seqAssign[object][key]['sequence'] == theSequence:
+                    seqAssign[object][key]['sequence'] = 'None'
+
+        #update GUI controls and menus
+        self.setObjectParameters(self.objectListBox.currentRow())
+
+        #refresh the sequence entry box to the newly selected sequence
+        index = self.seqListBox.currentRow()
+        name = seqList[index + 1]
+
+        if name == 'None':
+            self.seqEntry.setText('')
+        else:
+            entry = (seqDict[name])
+            entry = ','.join(entry)
+            self.seqEntry.setText(entry)
+
+    #adds a new trajectory
+    def addTrajectory(self):
+        global trajList,trajDict
+
+        #show input dialog for naming the trajectory
+        name, ok = QInputDialog.getText(self, 'Add Trajectory',
+            'Trajectory Name:')
+
+        #add to the trajectory list
+        trajList.append(name)
+        size = len(trajList)
+
+        #select the newly made trajectory
+        self.trajListBox.addItem(name)
+        self.trajListBox.setCurrentRow(size-2)
+        self.trajListBox.setSelectionMode(1)
+
+        #reset the trajectory angle/duration variables
+        self.trajAngle.setText('0')
+        self.trajDuration.setText('0')
+
+        #clear the angle/duration list boxes
+        self.angleListBox.clear()
+        self.durationListBox.clear()
+
+        #add trajectory to the trajectory menu
+        self.trajectory.addItem(name)
+
+        #add empty trajectory to the seqDict
+        trajDict[name] = {
+        'angle':[],
+        'duration':[]
+        }
+
+    #deletes the selected trajectory
+    def removeTrajectory(self):
+        global trajList, trajDict
+
+        #prevent deleting 'None'
+        size = len(trajList)
+        if size == 1:
+            return
+
+        #selected item and its index
+        item = self.trajListBox.currentItem()
+        index = self.trajListBox.currentRow()
+
+        #delete trajectory from the list box
+        self.trajListBox.takeItem(self.trajListBox.row(item))
+
+        #remove from trajList and trajDict
+        del trajList[index+1]
+
+        theTrajectory = item.text()
+        trajDict.pop(theTrajectory)
+
+        self.trajectory.removeItem(index + 1)
+
+        size = len(trajList)#new number of trajectories
+        if size == 1:
+            #clear old values
+            self.angleListBox.clear()
+            self.durationListBox.clear()
+            return
+        else:
+            item = self.trajListBox.currentItem() #new selection
+            name = item.text() #trajectory name
+            self.updateTrajectory(name)
+
+    #updates the angle/duration list boxes for the selected trajectory
+    def updateTrajectory(self,name):
+        #clear old values
+        self.angleListBox.clear()
+        self.durationListBox.clear()
+
+        #update with new values
+        angleList = trajDict[name]['angle']
+        durList = trajDict[name]['duration']
+
+        self.angleListBox.addItems(angleList)
+        self.durationListBox.addItems(durList)
+
+>>>>>>> Stashed changes
     #adds new object to the stimulus design
     def addStimObject(self):
         global objectList
 
         objectList.append('Circle')
         self.objectListBox.addItem('Circle')
+<<<<<<< Updated upstream
         self.maskObjectListBox.addItem('Circle')
         self.addStimDict()
 
         numObjects = len(objectList)
         self.objectListBox.setCurrentRow(numObjects-1)
         self.setObjectParameters(numObjects-1)
+=======
+        self.addStimDict()
+
+        numObjects = len(objectList)
+
+        self.objectListBox.setCurrentRow(numObjects-1)
+        self.setObjectParameters(numObjects-1)
+        self.displaySeqAssignments(numObjects-1)
+>>>>>>> Stashed changes
 
     #removes the selected stimulus object
     def removeStimObject(self):
         global objectList
 
+<<<<<<< Updated upstream
         if len(objectList) == 1: #doesn't delete last object
             return
 
@@ -380,6 +1026,42 @@ class App(QMainWindow):
             for key,_ in seqAssign[object].iteritems():
                 seqMenu = seqAssign[object][key]['control']
                 seqMenu.removeItem(index + 1) #add one to avoid deleting 'None'
+=======
+        numObjects = len(objectList)
+        if numObjects == 1: #doesn't delete last object
+            return
+
+        #which object is selected
+        index = self.objectListBox.currentRow()
+
+        #remove object from the stimulus and mask list boxes
+        self.objectListBox.takeItem(index)
+
+        #remove object from the stimulus object list
+        del objectList[index]
+
+        if index == numObjects - 1: #if its the last object, no dictionary shifting is necessary
+            stim.pop(index,None)
+            seqAssign.pop(index,None)
+        else:
+            numObjects = len(objectList)
+            #shift dictionary indices (for object indices 0,1,2 , deleting object 1 results in 0,1 dictionary indices)
+            for object in range(index,numObjects):
+                stim[object] = stim[object+1]
+                seqAssign[object] = seqAssign[object+1]
+
+            #now delete final dictionary entries
+            stim.pop(numObjects,None)
+            seqAssign.pop(numObjects,None)
+
+        #refresh the GUI with the newly selected object
+        index = self.objectListBox.currentRow()
+        if index == -1:
+            return
+
+        self.setObjectParameters(index)
+        self.displaySeqAssignments(index)
+>>>>>>> Stashed changes
 
     #Uses stimulus dictionary to fill out the parameters in the GUI for the selected object
     def setObjectParameters(self,index):
@@ -388,6 +1070,10 @@ class App(QMainWindow):
             return
 
         for key,val in stim[index].iteritems():
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
             #handle by control type
             type = control[key].__class__.__name__
             if type == 'QLineEdit':
@@ -396,9 +1082,18 @@ class App(QMainWindow):
             elif type == 'QComboBox':
                  #which index has the text
                 items = [control[key].itemText(i) for i in range(control[key].count())]
+<<<<<<< Updated upstream
                 whichItem = items.index(val)
                 control[key].setCurrentIndex(whichItem)
 
+=======
+                if val == '':
+                    whichItem = 0
+                else:
+                    whichItem = items.index(val)
+
+                control[key].setCurrentIndex(whichItem)
+>>>>>>> Stashed changes
                 #flip the controls depending on the drop down menu selection
                 self.flipControls(key,val)
 
@@ -413,6 +1108,11 @@ class App(QMainWindow):
             else:
                 #which item in sequence menu is it?
                 whichItem = seqList.index(sequence)
+<<<<<<< Updated upstream
+=======
+                if whichItem == -1:
+                    return
+>>>>>>> Stashed changes
                 control[key].setCurrentIndex(whichItem+1)
                 control[key].setStyleSheet("background-color: rgba(150, 245, 150, 150)")
 
@@ -435,30 +1135,147 @@ class App(QMainWindow):
     def flipControls(self,controlName,selection):
 
         if selection == 'Circle':
+<<<<<<< Updated upstream
+=======
+            #some object dependent repositioning
+            self.designPanelLayout.addWidget(self.angleLabel,9,8)
+            self.designPanelLayout.addWidget(self.angle,9,9)
+            self.designPanelLayout.addWidget(self.angleSeq,9,10)
+>>>>>>> Stashed changes
             for key,value in circleSettings.iteritems():
                 if value == 0:
                     control[key].hide()
                 else:
                     control[key].show()
+<<<<<<< Updated upstream
         elif selection == 'Rectangle':
             self.designPanelLayout.addWidget(self.orientationLabel,9,0)
             self.designPanelLayout.addWidget(self.orientation,9,1)
             self.designPanelLayout.addWidget(self.orientationSeq,9,2)
 
+=======
+            self.flipControls('motionType',self.motionType.currentText())
+
+        elif selection == 'Rectangle':
+            #some object dependent repositioning
+            self.designPanelLayout.addWidget(self.orientationLabel,9,0)
+            self.designPanelLayout.addWidget(self.orientation,9,1)
+            self.designPanelLayout.addWidget(self.orientationSeq,9,2)
+            self.designPanelLayout.addWidget(self.angleLabel,9,8)
+            self.designPanelLayout.addWidget(self.angle,9,9)
+            self.designPanelLayout.addWidget(self.angleSeq,9,10)
+>>>>>>> Stashed changes
             for key,value in rectangleSettings.iteritems():
                 if value == 0:
                     control[key].hide()
                 else:
                     control[key].show()
+<<<<<<< Updated upstream
         elif selection == 'Grating':
             self.designPanelLayout.addWidget(self.orientationLabel,10,0)
             self.designPanelLayout.addWidget(self.orientation,10,1)
             self.designPanelLayout.addWidget(self.orientationSeq,10,2)
+=======
+            self.flipControls('motionType',self.motionType.currentText())
+
+        elif selection == 'Grating':
+            #some object dependent repositioning
+            self.designPanelLayout.addWidget(self.orientationLabel,10,0)
+            self.designPanelLayout.addWidget(self.orientation,10,1)
+            self.designPanelLayout.addWidget(self.orientationSeq,10,2)
+            self.designPanelLayout.addWidget(self.angleLabel,8,8)
+            self.designPanelLayout.addWidget(self.angle,8,9)
+            self.designPanelLayout.addWidget(self.angleSeq,8,10)
+            self.designPanelLayout.addWidget(self.driftFreqLabel,7,8)
+            self.designPanelLayout.addWidget(self.driftFreq,7,9)
+            self.designPanelLayout.addWidget(self.driftFreqSeq,7,10)
+>>>>>>> Stashed changes
             for key,value in gratingSettings.iteritems():
                 if value == 0:
                     control[key].hide()
                 else:
                     control[key].show()
+<<<<<<< Updated upstream
+=======
+
+            #recursive call to set the motion/drift settings according to object type
+            self.flipControls('motionType',self.motionType.currentText())
+
+        elif selection == 'Noise':
+            #some object dependent repositioning
+            self.designPanelLayout.addWidget(self.angleLabel,9,8)
+            self.designPanelLayout.addWidget(self.angle,9,9)
+            self.designPanelLayout.addWidget(self.angleSeq,9,10)
+            for key,value in noiseSettings.iteritems():
+                if value == 0:
+                    control[key].hide()
+                else:
+                    control[key].show()
+            #recursive call to set the motion/drift settings according to object type
+            self.flipControls('motionType',self.motionType.currentText())
+
+        elif selection == 'Cloud':
+            #some object dependent repositioning
+            self.designPanelLayout.addWidget(self.angleLabel,9,8)
+            self.designPanelLayout.addWidget(self.angle,9,9)
+            self.designPanelLayout.addWidget(self.angleSeq,9,10)
+            for key,value in cloudSettings.iteritems():
+                if value == 0:
+                    control[key].hide()
+                else:
+                    control[key].show()
+            #recursive call to set the motion/drift settings according to object type
+            self.flipControls('motionType',self.motionType.currentText())
+
+        elif selection == 'Windmill':
+            #some object dependent repositioning
+            self.designPanelLayout.addWidget(self.orientationLabel,9,0)
+            self.designPanelLayout.addWidget(self.orientation,9,1)
+            self.designPanelLayout.addWidget(self.orientationSeq,9,2)
+            self.designPanelLayout.addWidget(self.driftFreqLabel,8,8)
+            self.designPanelLayout.addWidget(self.driftFreq,8,9)
+            self.designPanelLayout.addWidget(self.driftFreqSeq,8,10)
+            for key,value in windmillSettings.iteritems():
+                if value == 0:
+                    control[key].hide()
+                else:
+                    control[key].show()
+            #recursive call to set the motion/drift settings according to object type
+            self.flipControls('motionType',self.motionType.currentText())
+
+        elif selection == 'Annulus':
+            for key,value in annulusSettings.iteritems():
+                if value == 0:
+                    control[key].hide()
+                else:
+                    control[key].show()
+            self.flipControls('motionType',self.motionType.currentText())
+
+        elif selection == 'Image':
+            #some object dependent repositioning
+            self.designPanelLayout.addWidget(self.angleLabel,9,8)
+            self.designPanelLayout.addWidget(self.angle,9,9)
+            self.designPanelLayout.addWidget(self.angleSeq,9,10)
+            for key,value in imageSettings.iteritems():
+                if value == 0:
+                    control[key].hide()
+                else:
+                    control[key].show()
+            self.flipControls('motionType',self.motionType.currentText())
+
+        elif selection == 'Snake':
+            #some object dependent repositioning
+            self.designPanelLayout.addWidget(self.angleLabel,9,8)
+            self.designPanelLayout.addWidget(self.angle,9,9)
+            self.designPanelLayout.addWidget(self.angleSeq,9,10)
+            for key,value in snakeSettings.iteritems():
+                if value == 0:
+                    control[key].hide()
+                else:
+                    control[key].show()
+            self.flipControls('motionType',self.motionType.currentText())
+
+>>>>>>> Stashed changes
         elif selection == 'Static' and controlName == 'motionType':
             #self.designPanelLayout.addWidget(self.blank5,7,8,4,1)
             for key,value in staticMotionSettings.iteritems():
@@ -466,6 +1283,7 @@ class App(QMainWindow):
                     control[key].hide()
                 else:
                     control[key].show()
+<<<<<<< Updated upstream
         elif selection == 'Drift' and controlName == 'motionType':
             #self.designPanelLayout.addWidget(self.blank5,10,8,1,1)
             for key,value in driftMotionSettings.iteritems():
@@ -473,50 +1291,147 @@ class App(QMainWindow):
                     control[key].hide()
                 else:
                     control[key].show()
+=======
+
+        elif selection == 'Drift' and controlName == 'motionType':
+            #self.designPanelLayout.addWidget(self.blank5,10,8,1,1)
+            #Grating and windmill have different options for motion than other stimuli
+            if self.objectType.currentText() == 'Grating':
+                for key,value in driftGratingMotionSettings.iteritems():
+                    if value == 0:
+                        control[key].hide()
+                    else:
+                        control[key].show()
+            elif self.objectType.currentText() == 'Windmill':
+                for key,value in windmillMotionSettings.iteritems():
+                    if value == 0:
+                        control[key].hide()
+                    else:
+                        control[key].show()
+            else:
+                for key,value in driftMotionSettings.iteritems():
+                    if value == 0:
+                        control[key].hide()
+                    else:
+                        control[key].show()
+
+>>>>>>> Stashed changes
         elif selection == 'Static' and controlName == 'modulationType':
             for key,value in staticModSettings.iteritems():
                 if value == 0:
                     control[key].hide()
                 else:
                     control[key].show()
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
         elif selection != 'Static' and controlName == 'modulationType':
             for key,value in dynamicModSettings.iteritems():
                 if value == 0:
                     control[key].hide()
                 else:
                     control[key].show()
+<<<<<<< Updated upstream
+=======
+        elif selection == 'Cartesian' and controlName == 'coordinateType':
+            for key,value in cartesianSettings.iteritems():
+                if value == 0:
+                    control[key].hide()
+                else:
+                    control[key].show()
+        elif selection == 'Cartesian' and controlName == 'maskCoordinateType':
+            for key,value in cartesianMaskSettings.iteritems():
+                if value == 0:
+                    control[key].hide()
+                else:
+                    control[key].show()
+        elif selection == 'Polar' and controlName == 'coordinateType':
+            for key,value in polarSettings.iteritems():
+                if value == 0:
+                    control[key].hide()
+                else:
+                    control[key].show()
+        elif selection == 'Polar' and controlName == 'maskCoordinateType':
+            for key,value in polarMaskSettings.iteritems():
+                if value == 0:
+                    control[key].hide()
+                else:
+                    control[key].show()
+>>>>>>> Stashed changes
 
     #Converts 0-255 range to -1 to 1 range
     def getBackground(self):
-        if len(self.background.text()) > 0:
-            val = float(self.background.text())
-            bgnd = (2 * val/255) - 1 #normalize from -1 to 1
+        bgndStr = self.background.text()
+        if len(bgndStr) > 0:
+            if bgndStr.isnumeric():
+                val = float(self.background.text())
+                bgnd = (2 * val/255.) - 1 #normalize from -1 to 1
+            else:
+                control['background'].setText('0')
+                val = 0.0
+                bgnd = (2 * val/255.) - 1 #normalize from -1 to 1
             return bgnd
         else:
             return
 
+    #flips the sync spot on or off
+    def drawSyncSpot(self,contrastVal):
+        ppm = float(self.ppm.text())
+        if self.syncSpot.isChecked():
+            syncSpot = visual.Rect(
+            win = win,
+            units = 'pix',
+            width = 80 * ppm,
+            height = 80 * ppm,
+            fillColor = [1,1,1],
+            lineColor = [1,1,1],
+            contrast = contrastVal,
+            pos = (532-40,-404+40)
+            )
+
+            if isOpen == 1:
+                syncSpot.draw()
+
     #Open a stimulus window
     def initializeSession(self):
-        global win,isOpen,ifi
+        global win,isOpen,ifi,main
 
         bgnd = self.getBackground()
 
         win = visual.Window(
+<<<<<<< Updated upstream
             #size=[500, 500],
+=======
+            size=[1024,768],
+>>>>>>> Stashed changes
             units="pix",
             fullscr=True,
             color=[bgnd, bgnd, bgnd],
-            screen = 0,
-            monitor = None
+            allowStencil=True,
+            winType = 'pyglet',
+            screen = int(self.monitor.currentText()),
+            gamma = float(self.gammaTable.currentText())
         )
+
 
         #Frame rate
         ifi = 1/win.getActualFrameRate(10,100)
-
         isOpen = 1 #window is open
+
+        self.drawSyncSpot(-1) #dark sync spot
+        win.flip()
 
     #Fills out the stimulus parameters into a structure
     def runStim(self):
+        global runTime,stimID
+
+        #stimID
+        stimID = self.stimID.text()
+        if len(stimID) == 0:
+            stimID = 0
+        else:
+            stimID = int(stimID)
 
         #stim dictionary holds the parameters for all the objects
         numObjects = len(stim)
@@ -527,6 +1442,7 @@ class App(QMainWindow):
         yOffset = int(self.yOffset.text())
         trialTime = float(self.trialTime.text())
         repeats = int(self.repeats.text())
+<<<<<<< Updated upstream
         bgnd = self.getBackground()
 
         #runTime dictionary is created here, and will hold parameters
@@ -624,6 +1540,121 @@ class App(QMainWindow):
                     if stim[i]['modulationType'] != 'Static':
                         runTime[i]['halfCycle'] = int(round((0.5/stim[i]['modulationFreq'])/ifi)) #in number of frames
                         runTime[i]['cycleCount'] = 1
+=======
+
+        #sync spot
+        self.drawSyncSpot(-1) #dark sync spot
+        win.flip()
+
+        if self.loopCheck.isChecked() == True:
+            repeats = 1000
+        bgnd = self.getBackground()
+
+        #runTime dictionary is created here, and will hold parameters
+        #calculated at run time for each object
+        runTime = {}
+        #Timer dictionaries
+        timer = {}
+
+        #define the masks/aperture
+        if stim[0]['apertureStatus'] == 'On':
+            aperture = visual.Aperture(
+            win = win,
+            units = 'pix',
+            shape = 'circle',
+            size = stim[0]['apertureDiam'] * ppm,
+            inverted = False,
+            pos = (xOffset * ppm,yOffset * ppm)
+            )
+            aperture.enabled = True
+
+        #parallel port address
+        # port = parallel.ParallelPort(address=0x0378)
+        # print(port)
+
+        #make empty runtime dictionary
+        #holds parameters that change with time during the stimulus
+        for i in range(numObjects):
+            runTime[i] = {
+            'delayFrames':0,
+            'frames':0,
+            'startX':0,
+            'startY':0,
+            'halfCycle':0,
+            'cycleCount':1,
+            'phase':0,
+            'driftIncrement':0,
+            'firstIntensity':0,
+            'secondIntensity':0,
+            'stimulus':0,
+            'stimFrame':0,
+            'trajectory':{
+                'angle':[],
+                'startFrame':[],
+                'finalX':[],
+                'finalY':[]
+            }
+            }
+
+            timer[i] = 0
+
+        #start at 0 sweeps
+        numSweeps = 0
+
+        #check for sequence assignments to get the total number of sweeps
+        for i in range(numObjects):
+            for key,_ in seqAssign[i].iteritems():
+                sequence = seqAssign[i][key]['sequence']
+                if sequence != 'None':
+                    #extract sequence entry
+                    entry = seqDict[sequence]
+
+                    #size of entry
+                    size = len(entry)
+                    if size > numSweeps:
+                        numSweeps = size
+            #if trajectory, check if it contains sequences and add them to the sweep count
+            if stim[i]['trajectory'] != 'None':
+                name = stim[i]['trajectory']
+                numSegments = len(trajDict[name]['angle'])
+
+                for segment in range(numSegments):
+                    if trajDict[name]['angle'][segment].isnumeric():
+                        #numeric entry
+                        continue
+                    elif str(trajDict[name]['angle'][segment]) in seqList:
+                        #is the entry a sequence?
+                        #If so, replace the trajectory segment with the sequence entry for the current sweep
+                        sequence = str(trajDict[name]['angle'][segment])
+                        #extract sequence entry
+                        entry = seqDict[sequence]
+
+                        #size of entry
+                        size = len(entry)
+                        if size > numSweeps:
+                            numSweeps = size
+
+            #frame delay for each objectType
+            runTime[i]['delayFrames'] = int(round(stim[i]['delay']/ifi)) #round to nearest integer
+
+            #frame duration for each object
+            runTime[i]['frames'] = int(round(stim[i]['duration']/ifi)) #round to nearest integer
+
+        #What is the total duration of the stimulus, including delays?
+        durList = []
+        durList = [runTime[i]['delayFrames'] + runTime[i]['frames'] for i in range(numObjects)]
+        totalDuration = max(durList)
+
+        #if no sequences are assigned or they are all empty, set sweeps to 1
+        if numSweeps == 0:
+            numSweeps = 1
+
+        #STIMULUS LOOP #Loop through repeats
+        for repeat in range(repeats): #use repeat setting for first object
+
+            #loop through sweeps from sequence assignments
+            for sweep in range(numSweeps):
+>>>>>>> Stashed changes
 
                     #intensities
                     firstIntensity,secondIntensity = self.getIntensity(i)
@@ -638,12 +1669,122 @@ class App(QMainWindow):
                     #reset cycle counts
                     runTime[i]['cycleCount'] = 0
 
+                #reset frame counts
+                frameCount = 0
+
+
+
+                #check for sequence assignments and fill runtime dictionary
+                for i in range(numObjects):
+                    for key,_ in seqAssign[i].iteritems():
+                        sequence = seqAssign[i][key]['sequence']
+                        if sequence != 'None':
+                            #extract sequence entry
+                            entry = seqDict[sequence]
+                            #parent control name
+                            parent = seqAssign[i][key]['parent']
+                            #insert sequence variable into the stim dictionary for each sweep
+                            stim[i][parent] = float(entry[sweep])
+
+                    #Set runTime dictionary for each sweeps
+                    #piggy backs off the seqAssign loop, which also iterates through the objects
+
+                    #frame delay for each objectType
+                    runTime[i]['delayFrames'] = int(round(stim[i]['delay']/ifi)) #round to nearest integer
+
+                    #frame duration for each object
+                    runTime[i]['frames'] = int(round(stim[i]['duration']/ifi)) #round to nearest integer
+
+                    #starting positions of each object
+                    runTime[i]['startX'] = ppm * (xOffset + stim[i]['xPos']) + ppm * stim[i]['startRad'] * np.cos(stim[i]['angle'] * np.pi/180.)
+                    runTime[i]['startY'] = ppm * (yOffset + stim[i]['yPos']) + ppm * stim[i]['startRad'] * np.sin(stim[i]['angle'] * np.pi/180.)
+
+                    #Motion parameters
+                    if stim[i]['motionType'] == 'Drift':
+                        #if stim[i]['objectType'] == 'Grating':
+                        runTime[i]['driftIncrement'] =  stim[i]['driftFreq'] * ifi
+                                # elif stim[i]['objectType'] == 'Windmill':
+                                #   runTime[i]['driftIncrement'] = stim[i]['driftFreq'] * ifi
+
+                    #Modulation parameters
+                    if (stim[i]['modulationType'] == 'Square') or (stim[i]['modulationType'] == 'Sine'):
+                        runTime[i]['halfCycle'] = int(round((0.5/stim[i]['modulationFreq'])/ifi)) # number of frames per half cycle
+                        runTime[i]['cycleCount'] = 1
+
+                    elif stim[i]['modulationType'] == 'Chirp':
+                        chirpWave = self.buildChirp(i,ifi)
+                        #make sure total duration matches frame number if the stimulus is a chirp
+                        stim[i]['contrast'] = 100
+                        totalDuration = chirpWave.shape[0]
+                        runTime[i]['frames'] = totalDuration
+
+                    #noise frames per cycle
+                    if stim[i]['objectType'] == 'Noise':
+                        runTime[i]['halfCycle'] = int(round((0.5/stim[i]['noiseFreq'])/ifi)) # number of frames per half cycle
+                        runTime[i]['cycleCount'] = 1
+
+                    runTime[i]['phase'] = stim[i]['spatialPhase'] / 360.
+
+                    #intensities
+                    firstIntensity,secondIntensity = self.getIntensity(i)
+                    runTime[i]['firstIntensity'] = firstIntensity
+                    runTime[i]['secondIntensity'] = secondIntensity
+
+                    #Define stimulus
+                    runTime[i]['stimulus'] = self.defineStimulus(runTime,ppm,xOffset,yOffset,i,ifi)
+
+                    #reset stimulus frame counts
+                    runTime[i]['stimFrame'] = 0
+                    #reset cycle counts
+                    runTime[i]['cycleCount'] = 1
+
+                    #calculate trajectory frames
+                    if stim[i]['trajectory'] != 'None':
+                        self.calculateTrajectory(stim[i]['trajectory'],i,sweep,ifi,ppm,xOffset,yOffset)
+                        runTime[i]['frames'] = len(trajectoryStim[i]['yPos'])
+
+
+                #define the masks/aperture
+                if stim[0]['apertureStatus'] == 'On':
+                    aperture = visual.Aperture(
+                    win = win,
+                    units = 'pix',
+                    shape = 'circle',
+                    size = stim[0]['apertureDiam'] * ppm,
+                    inverted = False,
+                    pos = (xOffset * ppm,yOffset * ppm)
+                    )
+                    aperture.enabled = True
+
+
+                #Wait for trigger
+                if self.trigger.currentText() == 'Wait For Trigger':
+                    with ni.Task() as task:
+                        task.di_channels.add_di_chan('PCI6036/port0/line0')
+                        trigger = False
+                        while trigger == False:
+                            #read digital input P0.0 from the ephys board
+                            trigger = task.read()
+                elif self.trigger.currentText() == 'Send Trigger':
+                    with ni.Task() as task:
+                        #send digital pulse through P0.0 from the ephys board
+                        task.do_channels.add_do_chan('PCI6036/port0/line0')
+                        task.write(False)
+                        task.write(True)
+                        task.write(False)
+
+
                 #overall timer that is started before delay
                 totalTimer = 0
                 totalTimer = core.Clock()
 
                 #loop through total stimulus duration
                 for frame in range(totalDuration):
+<<<<<<< Updated upstream
+=======
+                    #flip sync spot to dark as default
+                    self.drawSyncSpot(-1)
+>>>>>>> Stashed changes
 
                     #Loop through each object
                     for i in range(numObjects):
@@ -653,6 +1794,7 @@ class App(QMainWindow):
                         secondIntensity = runTime[i]['secondIntensity']
 
                         #delay
+<<<<<<< Updated upstream
                         if frameCount < runTime[i]['delayFrames']:
                             continue
 
@@ -667,20 +1809,56 @@ class App(QMainWindow):
                             return
 
                         #Draw each stimulus object to the buffer window
+=======
+                        if frame < runTime[i]['delayFrames']:
+                            continue
+
+                        #duration
+                        if frame >= runTime[i]['delayFrames'] + runTime[i]['frames']:
+                            continue
+
+
+                        #sync spot bright
+                        self.drawSyncSpot(1)
+
+                        #start timer only on first frame of the stimulus
+                        # if runTime[i]['stimFrame'] == 0:
+                        #     timer[i] = 0
+                        #     timer[i] = core.Clock()
+
+                        #check for abort click
+                        if abortStatus:
+                            #Flip the window to background again
+                            self.drawSyncSpot(-1)
+                            win.flip()
+                            return
+
+                        #Update stimulus parameters and Draw each stimulus object to the buffer window
+>>>>>>> Stashed changes
 
                         #MOTION CLOUD STIMULI
                         if stim[i]['objectType'] == 'Cloud':
                             #get the motion cloud frame
+<<<<<<< Updated upstream
                             stimulus = visual.ImageStim(
                                 win=win,
                                 units = 'pix',
                                 image = motionCloud[:,:,frame],
                                 size = (500,500),
+=======
+
+                            stimulus = visual.ImageStim(
+                                win=win,
+                                units = 'pix',
+                                image = motionCloud[:,:,runTime[i]['stimFrame']],
+                                size = (1024,768),
+>>>>>>> Stashed changes
                                 ori = stim[i]['orientation'],
                                 pos = ((xOffset + stim[i]['xPos']) * ppm,(yOffset + stim[i]['yPos']) * ppm)
                                 )
 
                             runTime[i]['stimulus'] = stimulus
+<<<<<<< Updated upstream
                         else:
                             #NON-MOTION CLOUD STIMULI
 
@@ -711,6 +1889,58 @@ class App(QMainWindow):
                                             #non-grating stimuli
                                             runTime[i]['stimulus'].fillColor = [secondIntensity,secondIntensity,secondIntensity]
                                             runTime[i]['stimulus'].lineColor = [secondIntensity,secondIntensity,secondIntensity]
+=======
+
+                        #NOISE STIMULI
+                        elif stim[i]['objectType'] == 'Noise':
+                            #Flip the intensities between light/dark at each cycle
+                            if runTime[i]['stimFrame'] == runTime[i]['halfCycle'] * runTime[i]['cycleCount']:
+                                #if number of cycles divided by 2 is an even number we need to update the parameters
+                                if (runTime[i]['cycleCount'] % 2) == 0:
+                                    runTime[i]['stimulus'].updateNoise()
+                                runTime[i]['cycleCount'] = runTime[i]['cycleCount'] + 1 #counts which modulation cycle it's on
+
+                        elif stim[i]['objectType'] == 'Snake':
+                            xdist = ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.cos(stim[i]['angle'] * np.pi/180)
+                            ydist = ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.sin(stim[i]['angle'] * np.pi/180)
+
+                            x = runTime[i]['startX'] + xdist/2.
+                            y = runTime[i]['startY'] + ydist/2.
+
+                            runTime[i]['stimulus'].pos = (x,y)
+                            runTime[i]['stimulus'].width = ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi)
+
+                        #ALL OTHER STIMULI
+                        else:
+                            #Update position for moving stimuli
+                            if stim[i]['motionType'] == 'Drift':
+                                if stim[i]['objectType'] == 'Grating':
+                                    runTime[i]['stimulus'].phase = runTime[i]['phase'] + runTime[i]['driftIncrement'] * runTime[i]['stimFrame']
+                                elif stim[i]['objectType'] == 'Windmill':
+                                    if stim[i]['turnDirection'] == 'Clockwise':
+                                        runTime[i]['stimulus'].setOri(stim[i]['orientation'] + runTime[i]['driftIncrement'] * runTime[i]['stimFrame'])
+                                    elif stim[i]['turnDirection'] == 'Counterclockwise':
+                                        runTime[i]['stimulus'].setOri(stim[i]['orientation'] - runTime[i]['driftIncrement'] * runTime[i]['stimFrame'])
+                                else:
+                                    if stim[i]['trajectory'] == 'None':
+                                        x = runTime[i]['startX'] + ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.cos(stim[i]['angle'] * np.pi/180)
+                                        y = runTime[i]['startY'] + ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.sin(stim[i]['angle'] * np.pi/180)
+                                        runTime[i]['stimulus'].pos = (x,y)
+
+                                    else:
+                                        runTime[i]['stimulus'].pos = self.getTrajectoryPosition(i)
+
+                            #Update intensity for modulated stimuli
+
+                            if stim[i]['modulationType'] == 'Square':
+                                #Flip the intensities between light/dark at each cycle
+                                if runTime[i]['stimFrame'] == runTime[i]['halfCycle'] * runTime[i]['cycleCount']:
+
+                                    if (runTime[i]['cycleCount'] % 2) == 0:
+                                        runTime[i]['stimulus'].contrast = firstIntensity
+                                    else:
+                                        runTime[i]['stimulus'].contrast = secondIntensity
+>>>>>>> Stashed changes
 
                                     runTime[i]['cycleCount'] = runTime[i]['cycleCount'] + 1 #counts which modulation cycle it's on
 
@@ -721,6 +1951,7 @@ class App(QMainWindow):
                                 elif firstIntensity - bgnd < -1:
                                     firstIntensity = bgnd - 1
 
+<<<<<<< Updated upstream
                                 if stim[i]['objectType'] != 'Grating':
                                     intensity = (firstIntensity - bgnd) * math.sin(2 * math.pi * stim[i]['modulationFreq'] * timer[i].getTime())
                                     runTime[i]['stimulus'].fillColor = [intensity,intensity,intensity]
@@ -730,6 +1961,23 @@ class App(QMainWindow):
 
                         runTime[i]['stimulus'].draw() #draws every frame
 
+=======
+                                runTime[i]['stimulus'].contrast = (stim[i]['contrast']/100.0) * np.sin(2 * np.pi * stim[i]['modulationFreq'] * (runTime[i]['stimFrame'] * ifi))
+
+                            elif stim[i]['modulationType'] == 'Chirp':
+                                runTime[i]['stimulus'].contrast = chirpWave[runTime[i]['stimFrame']]
+
+                        runTime[i]['stimulus'].draw() #draws every frame
+
+                        if stim[i]['gratingType'] == 'Plaid':
+                            ortho.draw()
+
+                        #draw the mask if it is defined
+                        for index,_ in maskDict.iteritems():
+                            mask[index].draw()
+                        #     mask[i].draw()
+
+>>>>>>> Stashed changes
                         #increase stimFrame count if the code has reached here
                         runTime[i]['stimFrame'] = runTime[i]['stimFrame'] + 1
 
@@ -737,6 +1985,7 @@ class App(QMainWindow):
                     win.flip()
 
                     frameCount = frameCount + 1
+<<<<<<< Updated upstream
 
                 #Wait for trial time to expire before starting next sweep
                 while totalTimer.getTime() < trialTime:
@@ -763,10 +2012,57 @@ class App(QMainWindow):
         secondIntensity = runTime[i]['secondIntensity']
 
         if stim[i]['objectType'] == 'Circle':
+=======
+
+                #flip sync spot back to dark before next sweeep
+                self.drawSyncSpot(-1)
+                win.flip()
+
+                #Wait for trial time to expire before starting next sweep
+                while totalTimer.getTime() < trialTime:
+                    #flip the sync spot at the end of the sweep
+                    self.drawSyncSpot(-1)
+                    win.flip()
+
+            #Flip the window to background again
+            self.drawSyncSpot(-1)
+            win.flip()
+
+    #Defines the stimulus textures
+    def defineStimulus(self,runTime,ppm,xOffset,yOffset,i,ifi):
+        global motionCloud, mask, ortho#, innerRing, outerRing
+
+        firstIntensity = runTime[i]['firstIntensity']
+        secondIntensity = runTime[i]['secondIntensity']
+        bgnd = self.getBackground()
+
+        w = win.size[0]/2
+        h = win.size[1]/2
+
+        #polar coordinates or cartesian coordinates?
+        if stim[i]['coordinateType'] == 'Cartesian':
+            xPos = stim[i]['xpos']
+            yPos = stim[i]['ypos']
+        elif stim[i]['coordinateType'] == 'Polar':
+            xPos = stim[i]['polarRadius'] * np.cos(stim[i]['polarAngle'] * pi/180)
+            yPos = stim[i]['polarRadius'] * np.sin(stim[i]['polarAngle'] * pi/180)
+
+        if stim[i]['maskCoordinateType'] == 'Cartesian':
+            xPosMask = stim[i]['maskXPos']
+            yPosMask = stim[i]['maskYPos']
+        elif stim[i]['maskCoordinateType'] == 'Polar':
+            xPosMask = stim[i]['maskPolarRadius'] * np.cos(stim[i]['maskPolarAngle'] * pi/180)
+            yPosMask = stim[i]['maskPolarRadius'] * np.sin(stim[i]['maskPolarAngle'] * pi/180)
+
+
+        if stim[i]['objectType'] == 'Circle':
+
+>>>>>>> Stashed changes
             stimulus = visual.Circle(
             win = win,
             units = 'pix',
             radius = stim[i]['diameter']*ppm/2,
+<<<<<<< Updated upstream
             fillColor = [firstIntensity,firstIntensity,firstIntensity],
             lineColor = [firstIntensity,firstIntensity,firstIntensity],
             edges = 100,
@@ -774,12 +2070,25 @@ class App(QMainWindow):
             )
 
         elif stim[i]['objectType'] == 'Rectangle':
+=======
+            fillColor = [1,1,1],
+            lineColor = [1,1,1],
+            contrast = firstIntensity,
+            edges = 100,
+            pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
+            )
+        elif stim[i]['objectType'] == 'Rectangle':
+            #resolve masks
+            #mask = self.getMask(w,h,i,ppm)
+
+>>>>>>> Stashed changes
             stimulus = visual.Rect(
             win = win,
             units = 'pix',
             width = stim[i]['width'] * ppm,
             height = stim[i]['length'] * ppm,
             ori = stim[i]['orientation'],
+<<<<<<< Updated upstream
             fillColor = [firstIntensity,firstIntensity,firstIntensity],
             lineColor = [firstIntensity,firstIntensity,firstIntensity],
             pos = ((xOffset+ stim[i]['xPos']) * ppm,(yOffset + stim[i]['yPos']) * ppm)
@@ -819,6 +2128,403 @@ class App(QMainWindow):
 
         return stimulus
 
+=======
+            fillColor = [1,1,1],
+            lineColor = [1,1,1],
+            contrast = firstIntensity,
+            pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
+            )
+        elif stim[i]['objectType'] == 'Grating':
+            #type of grating
+            type = self.getGratingType(i)
+
+
+            #resolve masks
+            #mask = self.getMask(w,h,i,ppm)
+
+            stimulus = visual.GratingStim(
+            win = win,
+            units = 'pix',
+            size=[w*2,h*2],
+            tex = type,
+            texRes = 256,
+            #mask = mask,
+            #maskParams = {'fringeWidth':0.2},
+            sf = stim[i]['spatialFreq'] / (ppm * 1000),
+            ori = stim[i]['orientation'],
+            phase = stim[i]['spatialPhase']/360.0,#phase is fractional from 0 to 1
+            color = [1,1,1],
+            contrast = stim[i]['contrast']/100.0,
+            pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
+            )
+
+            #make orthogonal grating
+
+            if stim[i]['gratingType'] == 'Plaid':
+                ortho = visual.GratingStim(
+                win = win,
+                units = 'pix',
+                size=[w*2,h*2],
+                tex = type,
+                texRes = 256,
+                #mask = mask,
+                #maskParams = {'fringeWidth':0.2},
+                sf = stim[i]['spatialFreq'] / (ppm * 1000),
+                ori = stim[i]['orientation'] + 90,
+                phase = stim[i]['spatialPhase']/360.0,#phase is fractional from 0 to 1
+                color = [1,1,1],
+                contrast = stim[i]['contrast']/100.0,
+                opacity = 0.5,
+                pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
+                )
+        elif stim[i]['objectType'] == 'Noise':
+            #set the seed for random number generator
+            np.random.seed(stim[i]['noiseSeed'])
+
+            stimulus = visual.NoiseStim(
+            win = win,
+            size = [512,512],
+            units = 'pix',
+            noiseType = stim[i]['noiseType'],
+            contrast = stim[i]['contrast']/100.0,
+            noiseElementSize = stim[i]['noiseSize'] * ppm,
+            noiseClip = 1,
+            pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
+            )
+        elif stim[i]['objectType'] == 'Cloud':
+
+            #Motion Clouds (keyword) parameters:
+            #size    -- power of two to define the frame size (N_X, N_Y)
+            #size_T  -- power of two to define the number of frames (N_frame)
+            #N_X     -- frame size horizontal dimension [px]
+            #N_Y     -- frame size vertical dimension [px]
+            #N_frame -- number of frames [frames] (a full period in time frames)
+            #alpha   -- exponent for the color envelope.
+            #sf_0    -- mean spatial frequency relative to the sampling frequency.
+            #ft_0    -- spatiotemporal scaling factor.
+            #B_sf    -- spatial frequency bandwidth
+            #V_X     -- horizontal speed component
+            #V_Y     -- vertical speed component
+            #B_V     -- speed bandwidth
+            #theta   -- mean orientation of the Gabor kernel
+            #B_theta -- orientation bandwidth
+            #loggabor-- (boolean) if True it uses a log-Gabor kernel (instead of the traditional gabor)
+
+            #DEFAULTS from MotionClouds.py
+            # size of the stimulus
+            #size = 8
+            #size_T = 8
+            #N_X = 2**size ->256 pixels
+            #N_Y = N_X ->256 pixels
+            #N_frame = 2**size_T ->256 frames
+
+            # default parameters for the "standard Motion Cloud"
+            #sf_0 = 0.125
+            #B_sf = 0.1
+            #V_X = 1.
+            #V_Y = 0.
+            #B_V = .5
+            #theta = 0.
+            #B_theta = np.pi/16.
+
+            # define Fourier domain
+            frames = int(stim[i]['duration']/ifi)
+            #fx, fy, ft = mc.get_grids(mc.N_X, mc.N_Y, mc.N_frame)
+
+            #proportional to 1024 x 768
+            fx, fy, ft = mc.get_grids(256, 256, frames+1)
+            # define an envelope
+
+            #testTime = 0
+            #testTime = core.Clock()
+
+            #this is the most time intensive step - 50%
+            envelope = mc.envelope_gabor(fx, fy, ft,
+            V_X=stim[i]['cloudSpeedX'], V_Y=stim[i]['cloudSpeedY'], B_V=stim[i]['cloudSpeedBand'],
+            sf_0=stim[i]['cloudSF'], B_sf=stim[i]['cloudSFBand'],
+            theta=stim[i]['cloudOrient'] * np.pi/180, B_theta=stim[i]['cloudOrientBand'] * np.pi/180, alpha=0.)
+
+            #print(testTime.getTime())
+
+            #testTime = 0
+            #testTime = core.Clock()
+
+            #this is the second most time intensive step - 43%
+            motionCloud = mc.random_cloud(envelope)
+
+            #print(testTime.getTime())
+
+            #testTime = 0
+            #testTime = core.Clock()
+
+            #this is the least time intensive step - 6%
+            motionCloud = self.rectif_stimGen(motionCloud,contrast=stim[i]['contrast']/100.0,method='Michelson',verbose=False)
+
+
+            #print(testTime.getTime())
+            #doesn't return the stimulus, but sets the array as a global
+            return
+        elif stim[i]['objectType'] == 'Windmill':
+            #type of grating
+            type = self.getGratingType(i)
+
+            #resolve masks
+            #mask = self.getMask(w,h,i,ppm)
+
+            #radialCycles = stim[i]['angularSpatialPeriod'] / (ppm * 1000) #degrees per cycle
+
+            stimulus = visual.RadialStim(
+            win = win,
+            units = 'pix',
+            size=[w*2,h*2],
+            tex = type,
+            texRes = 256,
+            #mask = mask,
+            #maskParams = {'fringeWidth':0.2},
+            ori =  stim[i]['orientation'],
+            angularCycles = stim[i]['angularCycles'],
+            angularRes = 360,
+            color = [1,1,1],
+            contrast = stim[i]['contrast']/100.0,
+            pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
+            )
+        elif stim[i]['objectType'] == 'Annulus':
+            #inner ring is the background
+            innerRing = visual.Circle(
+            win = win,
+            units = 'pix',
+            radius = stim[i]['innerDiameter']*ppm/4,#not sure why, but need divide by 4 for correct scale after converting to imageStim
+            fillColor = [1,1,1],
+            lineColor = [1,1,1],
+            contrast = bgnd,
+            edges = 100,
+            pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
+            )
+
+            #outer ring is the specified contrast value
+            outerRing = visual.Circle(
+            win = win,
+            units = 'pix',
+            radius = stim[i]['outerDiameter']*ppm/4,#not sure why, but need divide by 4 for correct scale after converting to imageStim
+            fillColor = [1,1,1],
+            lineColor = [1,1,1],
+            #contrast = firstIntensity,
+            edges = 100,
+            pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
+            )
+
+            buffer = visual.BufferImageStim(
+            win = win,
+            stim = (outerRing,innerRing)
+            )
+
+            #work around to allow position changes to both inner and outer rings during stimulus presentation
+            stimulus = visual.ImageStim(
+            win = win,
+            units = 'pix',
+            image = buffer.image,
+            contrast = firstIntensity
+            )
+        elif stim[i]['objectType'] == 'Snake':
+            #is the snake moving using a trajectory?
+            #if so, we need a different snake for every trajectory segment
+            if stim[i]['trajectory'] != 'None':
+                name = stim[i]['trajectory']
+                numSegments = len(trajDict[name]['angle'])
+            else:
+                numSegments = 1
+
+            stimulus = visual.Rect(
+            win = win,
+            units = 'pix',
+            width = stim[i]['width'] * ppm,
+            height = stim[i]['length'] * ppm,
+            ori = -stim[i]['angle'],
+            fillColor = [1,1,1],
+            lineColor = [1,1,1],
+            contrast = firstIntensity,
+            pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
+            )
+        elif stim[i]['objectType'] == 'Image':
+            subfolder = self.subFolder.currentText()
+            imagePath = stimPath + subfolder + '/' + self.imagePath.currentText() + '.bmp'
+
+            if imagePath != '':
+                stimulus = visual.ImageStim(
+                    win=win,
+                    units = 'pix',
+                    image = imagePath,
+                    size = (1024,768),
+                    ori = stim[i]['orientation'],
+                    pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
+                    )
+        else:
+            print('other')
+
+        mask = {}
+        for i,_ in maskDict.iteritems():
+            if maskDict[i]['maskType'] == 'Circle':
+                mask[i] = visual.Circle(
+                win = win,
+                units = 'pix',
+                radius = maskDict[i]['maskDiameter']*ppm/2,
+                fillColor = [1,1,1],
+                lineColor = [1,1,1],
+                contrast = bgnd,
+                edges = 100,
+                pos = ((xOffset + xPosMask) * ppm,(yOffset + yPosMask) * ppm)
+                )
+
+        return stimulus
+
+    #calculates the frames for each segent of the trajectory
+    def calculateTrajectory(self,name,i,sweep,ifi,ppm,xOffset,yOffset):
+        global runTime,trajectoryStim
+
+        #makes a working copy of trajectory dictionary in case it contains a sequence string
+        #in this case the working copy needs to be edited to contain the values within the sequence.
+        liveTrajDict = copy.deepcopy(trajDict)
+
+        numSegments = len(trajDict[name]['angle'])
+
+        for segment in range(numSegments):
+            if trajDict[name]['angle'][segment].isnumeric():
+                #numeric entry
+                continue
+            elif str(trajDict[name]['angle'][segment]) in seqList:
+                #is the entry a sequence?
+                #If so, replace the trajectory segment with the sequence entry for the current sweep
+                theSequence = str(trajDict[name]['angle'][segment])
+                liveTrajDict[name]['angle'][segment] = seqDict[theSequence][sweep]
+
+        #make trajectory dictionary for the object
+        trajectoryStim[i] = {
+        'xPos':np.zeros(0),
+        'yPos':np.zeros(0)
+        }
+
+        for segment in range(numSegments):
+
+            #get angles and total frames per segment
+            runTime[i]['trajectory']['angle'].append(liveTrajDict[name]['angle'][segment])
+
+            #calculate which frame each segment will start on
+            if segment == 0:
+                numFrames = int(round(float(liveTrajDict[name]['duration'][segment])/ifi)) #frames in the current segment
+                segmentFrames = np.zeros(numFrames)
+
+                runTime[i]['trajectory']['startFrame'].append(0)
+
+                #start position for first segment
+                startX = ppm * (xOffset + stim[i]['xPos']) + ppm * stim[i]['startRad'] * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180.)
+                startY = ppm * (yOffset + stim[i]['yPos']) + ppm * stim[i]['startRad'] * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180.)
+
+                #X position segment
+                segmentFrames[:] = [startX + ppm * stim[i]['speed'] * ifi * t * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
+                trajectoryStim[i]['xPos'] = np.append(trajectoryStim[i]['xPos'],segmentFrames)
+
+                #Y position segment
+                segmentFrames[:] = [startY + ppm * stim[i]['speed'] * ifi * t * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
+                trajectoryStim[i]['yPos'] = np.append(trajectoryStim[i]['yPos'],segmentFrames)
+            else:
+
+                numFrames = int(round(float(liveTrajDict[name]['duration'][segment])/ifi)) #frames in the current segment
+                segmentFrames = np.zeros(numFrames)
+
+                size = len(trajectoryStim[i]['xPos'])
+                prevStartPos = trajectoryStim[i]['xPos'][size-1]
+                segmentFrames[:] = [prevStartPos + ppm * stim[i]['speed'] * ifi * t * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
+                trajectoryStim[i]['xPos'] = np.append(trajectoryStim[i]['xPos'],segmentFrames)
+
+                size = len(trajectoryStim[i]['yPos'])
+                prevStartPos = trajectoryStim[i]['yPos'][size-1]
+                segmentFrames[:] = [prevStartPos + ppm * stim[i]['speed'] * ifi * t * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
+                trajectoryStim[i]['yPos'] = np.append(trajectoryStim[i]['yPos'],segmentFrames)
+
+    #returns the X/Y position of the object according to its trajectory
+    def getTrajectoryPosition(self,i):
+
+        if runTime[i]['stimFrame'] > len(trajectoryStim[i]['xPos']):
+            x = trajectoryStim[i]['xPos'][len(trajectoryStim[i]['xPos'])-1]
+            y = trajectoryStim[i]['yPos'][len(trajectoryStim[i]['xPos'])-1]
+        else:
+            x = trajectoryStim[i]['xPos'][runTime[i]['stimFrame']]
+            y = trajectoryStim[i]['yPos'][runTime[i]['stimFrame']]
+        return (x,y)
+
+    #builds the wave to hold the temporal modulation for a chirp stimulus
+    def buildChirp(self,i,ifi):
+        contrast = stim[i]['contrast'] / 100.0 #contrast chirp maximum
+        TF_low = 0.5 #low end of the temporal frequency chirp
+        TF_high = 8.0 #high end of the temporal frequency chirp
+        TF_mid = 3.0 #temporal frequency for the contrast chirp
+        duration = int(round(15.0/ifi)) #15 second chirp stimulus
+
+        chirpWave = np.zeros(0) #makes chirp wave of set duration
+
+        #initial flashes
+        segment = np.full(int(round(1./ifi)),-contrast)
+        chirpWave = np.append(chirpWave,segment)
+
+        segment = np.full(int(round(1./ifi)),contrast)
+        chirpWave = np.append(chirpWave,segment)
+
+        segment = np.full(int(round(1./ifi)),-contrast)
+        chirpWave = np.append(chirpWave,segment)
+
+        segment = np.zeros(int(round(1./ifi)))
+        chirpWave = np.append(chirpWave,segment)
+
+        frames = int(round(4.0/ifi)) + 1 # length in frames of the temporal frequency and contrast chirps. Set for 4 seconds currently.
+
+        #temporal frequency chirp
+        segment = np.zeros(frames)
+        segment[:] = [contrast * math.sin(4.0 * 2 * math.pi * 0.5 * ((TF_high * x/frames) + TF_low) * x/frames) for x in np.arange(0,frames,1)]
+        chirpWave = np.append(chirpWave,segment)
+
+        #1 second pause in between temporal frequency and contrast chirps
+        segment = np.zeros(int(round(1.0/ifi)))
+        chirpWave = np.append(chirpWave,segment)
+
+        #contrast chirp
+        segment = np.zeros(frames)
+        segment[:] = [contrast * x/frames * math.sin(4.0 * 2 * math.pi * TF_mid * x/frames) for x in np.arange(0,frames,1)]
+        chirpWave = np.append(chirpWave,segment)
+
+        #final flash back to dark
+        segment = np.zeros(int(round(1./ifi)))
+        chirpWave = np.append(chirpWave,segment)
+
+        segment = np.full(int(round(1./ifi)),-contrast)
+        chirpWave = np.append(chirpWave,segment)
+
+        return chirpWave
+
+    #returns the type of grating in the GratingType drop down menu
+    def getGratingType(self,objectNum):
+        if stim[objectNum]['gratingType'] == 'Sine':
+            type = 'sin'
+        elif stim[objectNum]['gratingType'] == 'Square':
+            type = 'sqr'
+        elif stim[objectNum]['gratingType'] == 'Plaid':
+            type = 'sin'
+        return type
+
+    #returns a numpy array as a mask
+    def getMask(self,w,h,objectNum,ppm):
+        if stim[objectNum]['maskType'] != 'None':
+            if stim[objectNum]['maskObjectType'] == 'Circle':
+                mask = self.create_circular_mask(w, h, stim[objectNum]['maskType'], [w/2 + stim[objectNum]['maskXPos'] * ppm, h/2 + stim[objectNum]['maskYPos'] * ppm], stim[objectNum]['maskDiameter'] * ppm/2)
+            elif stim[objectNum]['maskObjectType'] == 'Gaussian':
+                mask = 'gauss'
+            elif stim[objectNum]['maskObjectType'] == 'Blur':
+                mask = 'raisedCos'
+        else:
+            mask = 'None'
+
+        return mask
+
+>>>>>>> Stashed changes
     #alternative rectifier that goes -1 to 1 instead of MotionCloud's 0 to 1
     def rectif_stimGen(self,z_in, contrast, method, verbose):
         """
@@ -909,7 +2615,11 @@ class App(QMainWindow):
 
     #Adds another stimulus dictionary for the new object
     def addStimDict(self):
+<<<<<<< Updated upstream
         global stim
+=======
+        global stim, seqAssign
+>>>>>>> Stashed changes
 
         numObjects = len(objectList)
 
@@ -921,23 +2631,70 @@ class App(QMainWindow):
         'coordinateType':'Cartesian',
         'xPos':0,
         'yPos':0,
+<<<<<<< Updated upstream
         'diameter':0,
+=======
+        'polarRadius':0,
+        'polarAngle':0,
+        'diameter':0,
+        'innerDiameter':0,
+        'outerDiameter':0,
+>>>>>>> Stashed changes
         'length':0,
         'width':0,
         'spatialFreq':0,
         'spatialPhase':0,
+<<<<<<< Updated upstream
+=======
+        'angularCycles':0,
+>>>>>>> Stashed changes
         'orientation':0,
         'contrastType':'Weber',
         'contrast':0,
         'modulationType':'Static',
         'modulationFreq':0,
         'motionType':'Static',
+<<<<<<< Updated upstream
         'speed':0,
         'startRad':0,
         'angle':0,
         'trajectory':'None',
         'delay':float(self.delay.text()),
         'duration':float(self.duration.text()),
+=======
+        'turnDirection':'Clockwise',
+        'speed':0,
+        'driftFreq':0,
+        'startRad':0,
+        'angle':0,
+        'apertureStatus':'Off',
+        'apertureDiam':0,
+        'maskCoordinateType':'Cartesian',
+        'maskObjectType':'Circle',
+        'maskDiameter':0,
+        'maskXPos':0,
+        'maskYPos':0,
+        'maskPolarRadius':0,
+        'maskPolarAngle':0,
+        'apertureStatus':'Off',
+        'apertureDiam':0,
+        'noiseType':'Binary',
+        'noiseSize':0,
+        'noiseSeed':0,
+        'noiseFreq':0,
+        'cloudSF':0,
+        'cloudSFBand':0,
+        'cloudSpeedX':0,
+        'cloudSpeedY':0,
+        'cloudSpeedBand':0,
+        'cloudOrient':0,
+        'cloudOrientBand':0,
+        'imagePath':'',
+        'trajectory':'None',
+        'delay':float(self.delay.text()),
+        'duration':float(self.duration.text()),
+        'trialTime':float(self.trialTime.text())
+>>>>>>> Stashed changes
         }
 
         seqAssign[numObjects - 1] = {
@@ -946,6 +2703,19 @@ class App(QMainWindow):
             'parent':'diameter',
             'sequence':'None'
             },
+<<<<<<< Updated upstream
+=======
+        'innerDiameterSeq':{
+            'control':self.innerDiameterSeq,
+            'parent':'innerDiameter',
+            'sequence':'None'
+            },
+        'outerDiameterSeq':{
+            'control':self.outerDiameterSeq,
+            'parent':'outerDiameter',
+            'sequence':'None'
+            },
+>>>>>>> Stashed changes
         'lengthSeq':{
             'control':self.lengthSeq,
             'parent':'length',
@@ -971,6 +2741,14 @@ class App(QMainWindow):
             'parent':'spatialPhase',
             'sequence':'None'
             },
+<<<<<<< Updated upstream
+=======
+        'angularCyclesSeq':{
+            'control':self.angularCyclesSeq,
+            'parent':'angularCycles',
+            'sequence':'None'
+            },
+>>>>>>> Stashed changes
         'contrastSeq':{
             'control':self.contrastSeq,
             'parent':'contrast',
@@ -991,11 +2769,32 @@ class App(QMainWindow):
             'parent':'yPos',
             'sequence':'None'
             },
+<<<<<<< Updated upstream
+=======
+        'polarRadiusSeq':{
+            'control':self.polarRadiusSeq,
+            'parent':'polarRadius',
+            'sequence':'None'
+            },
+        'polarAngleSeq':{
+            'control':self.polarAngleSeq,
+            'parent':'polarAngle',
+            'sequence':'None'
+            },
+>>>>>>> Stashed changes
         'speedSeq':{
             'control':self.speedSeq,
             'parent':'speed',
             'sequence':'None'
             },
+<<<<<<< Updated upstream
+=======
+        'driftFreqSeq':{
+            'control':self.driftFreqSeq,
+            'parent':'driftFreq',
+            'sequence':'None'
+            },
+>>>>>>> Stashed changes
         'startRadSeq':{
             'control':self.startRadSeq,
             'parent':'startRad',
@@ -1006,6 +2805,24 @@ class App(QMainWindow):
             'parent':'angle',
             'sequence':'None'
             },
+<<<<<<< Updated upstream
+=======
+        'noiseSizeSeq':{
+            'control':self.noiseSizeSeq,
+            'parent':'noiseSize',
+            'sequence':'None'
+        },
+        'noiseSeedSeq':{
+            'control':self.noiseSeedSeq,
+            'parent':'noiseSeed',
+            'sequence':'None'
+        },
+        'noiseFreqSeq':{
+            'control':self.noiseFreqSeq,
+            'parent':'noiseFreq',
+            'sequence':'None'
+        },
+>>>>>>> Stashed changes
         'delaySeq':{
             'control':self.delaySeq,
             'parent':'delay',
@@ -1016,6 +2833,14 @@ class App(QMainWindow):
             'parent':'duration',
             'sequence':'None'
             },
+<<<<<<< Updated upstream
+=======
+        'apertureDiamSeq':{
+            'control':self.apertureDiamSeq,
+            'parent':'apertureDiam',
+            'sequence':'None'
+            },
+>>>>>>> Stashed changes
         'maskXPosSeq':{
             'control':self.maskXPosSeq,
             'parent':'maskXPos',
@@ -1025,6 +2850,24 @@ class App(QMainWindow):
             'control':self.maskYPosSeq,
             'parent':'maskYPos',
             'sequence':'None'
+<<<<<<< Updated upstream
+=======
+            },
+        'maskPolarRadiusSeq':{
+            'control':self.maskPolarRadiusSeq,
+            'parent':'maskPolarRadius',
+            'sequence':'None'
+            },
+        'maskPolarAngleSeq':{
+            'control':self.maskPolarAngleSeq,
+            'parent':'maskPolarAngle',
+            'sequence':'None'
+            },
+        'maskDiameterSeq':{
+            'control':self.maskDiameterSeq,
+            'parent':'maskDiameter',
+            'sequence':'None'
+>>>>>>> Stashed changes
             }
         }
 
@@ -1037,16 +2880,45 @@ class App(QMainWindow):
         'objectListBox':self.objectListBox,
         'objectType':self.objectType,
         'gratingType':self.gratingType,
+<<<<<<< Updated upstream
         'coordianateType':self.coordinateType,
+=======
+        'coordinateType':self.coordinateType,
+>>>>>>> Stashed changes
         'xPos':self.xPos,
         'xPosLabel':self.xPosLabel,
         'xPosSeq':self.xPosSeq,
         'yPos':self.yPos,
         'yPosLabel':self.yPosLabel,
         'yPosSeq':self.yPosSeq,
+<<<<<<< Updated upstream
         'diameter':self.diameter,
         'diameterLabel':self.diameterLabel,
         'diameterSeq':self.diameterSeq,
+=======
+        'polarRadius':self.polarRadius,
+        'polarRadiusLabel':self.polarRadiusLabel,
+        'polarRadiusSeq':self.polarRadiusSeq,
+        'polarAngle':self.polarAngle,
+        'polarAngleLabel':self.polarAngleLabel,
+        'polarAngleSeq':self.polarAngleSeq,
+        'maskPolarRadius':self.maskPolarRadius,
+        'maskPolarRadiusLabel':self.maskPolarRadiusLabel,
+        'maskPolarRadiusSeq':self.maskPolarRadiusSeq,
+        'maskPolarAngle':self.maskPolarAngle,
+        'maskPolarAngleLabel':self.maskPolarAngleLabel,
+        'maskPolarAngleSeq':self.maskPolarAngleSeq,
+        'diameter':self.diameter,
+        'diameterLabel':self.diameterLabel,
+        'diameterSeq':self.diameterSeq,
+        'imagePath':self.imagePath,
+        'innerDiameter':self.innerDiameter,
+        'innerDiameterLabel':self.innerDiameterLabel,
+        'innerDiameterSeq':self.innerDiameterSeq,
+        'outerDiameter':self.outerDiameter,
+        'outerDiameterLabel':self.outerDiameterLabel,
+        'outerDiameterSeq':self.outerDiameterSeq,
+>>>>>>> Stashed changes
         'length':self.length,
         'lengthLabel':self.lengthLabel,
         'lengthSeq':self.lengthSeq,
@@ -1059,6 +2931,12 @@ class App(QMainWindow):
         'spatialPhase':self.spatialPhase,
         'spatialPhaseLabel':self.spatialPhaseLabel,
         'spatialPhaseSeq':self.spatialPhaseSeq,
+<<<<<<< Updated upstream
+=======
+        'angularCyclesLabel':self.angularCyclesLabel,
+        'angularCycles':self.angularCycles,
+        'angularCyclesSeq':self.angularCyclesSeq,
+>>>>>>> Stashed changes
         'orientation':self.orientation,
         'orientationLabel':self.orientationLabel,
         'orientationSeq':self.orientationSeq,
@@ -1071,9 +2949,19 @@ class App(QMainWindow):
         'modulationFreqLabel':self.modulationFreqLabel,
         'modulationFreqSeq':self.modulationFreqSeq,
         'motionType':self.motionType,
+<<<<<<< Updated upstream
         'speed':self.speed,
         'speedLabel':self.speedLabel,
         'speedSeq':self.speedSeq,
+=======
+        'turnDirection':self.turnDirection,
+        'speed':self.speed,
+        'speedLabel':self.speedLabel,
+        'speedSeq':self.speedSeq,
+        'driftFreqLabel':self.driftFreqLabel,
+        'driftFreq':self.driftFreq,
+        'driftFreqSeq':self.driftFreqSeq,
+>>>>>>> Stashed changes
         'startRad':self.startRad,
         'startRadLabel':self.startRadLabel,
         'startRadSeq':self.startRadSeq,
@@ -1083,7 +2971,15 @@ class App(QMainWindow):
         'coordinateType':self.coordinateType,
         'xOffset':self.xOffset,
         'yOffset':self.yOffset,
+<<<<<<< Updated upstream
         'maskType':self.maskType,
+=======
+        'apertureLabel':self.apertureLabel,
+        'apertureStatus':self.apertureStatus,
+        'apertureDiamLabel':self.apertureDiamLabel,
+        'apertureDiam':self.apertureDiam,
+        'apertureDiamSeq':self.apertureDiamSeq,
+>>>>>>> Stashed changes
         'maskObjectType':self.maskObjectType,
         'maskCoordinateType':self.maskCoordinateType,
         'maskXPos':self.maskXPos,
@@ -1092,6 +2988,14 @@ class App(QMainWindow):
         'maskYPos':self.maskYPos,
         'maskYPosLabel':self.maskYPosLabel,
         'maskYPosSeq':self.maskYPosSeq,
+<<<<<<< Updated upstream
+=======
+        'maskDiameter':self.maskDiameter,
+        'maskDiameterLabel':self.maskDiameterLabel,
+        'maskDiameterSeq':self.maskDiameterSeq,
+        'addMask':self.addMask,
+        'removeMask':self.removeMask,
+>>>>>>> Stashed changes
         'seqEntry':self.seqEntry,
         'maskObjectListBox':self.maskObjectListBox,
         'trajectory':self.trajectory,
@@ -1106,6 +3010,7 @@ class App(QMainWindow):
         'durationSeq':self.durationSeq,
         'delay':self.delay,
         'delaySeq':self.delaySeq,
+<<<<<<< Updated upstream
         'background':self.background
         }
 
@@ -1119,6 +3024,49 @@ class App(QMainWindow):
         'diameter':1,
         'diameterLabel':1,
         'diameterSeq':1,
+=======
+        'background':self.background,
+        'cloudSFLabel':self.cloudSFLabel,
+        'cloudSF':self.cloudSF,
+        'cloudSFBand':self.cloudSFBand,
+        'cloudSpeedLabel':self.cloudSpeedLabel,
+        'cloudSpeedX':self.cloudSpeedX,
+        'cloudSpeedY':self.cloudSpeedY,
+        'cloudSpeedBandLabel':self.cloudSpeedBandLabel,
+        'cloudSpeedBand':self.cloudSpeedBand,
+        'cloudOrientLabel':self.cloudOrientLabel,
+        'cloudOrient':self.cloudOrient,
+        'cloudOrientBand':self.cloudOrientBand,
+        'noiseType':self.noiseType,
+        'noiseSizeLabel':self.noiseSizeLabel,
+        'noiseSize':self.noiseSize,
+        'noiseSizeSeq':self.noiseSizeSeq,
+        'noiseSeedLabel':self.noiseSeedLabel,
+        'noiseSeed':self.noiseSeed,
+        'noiseSeedSeq':self.noiseSeedSeq,
+        'noiseFreqLabel':self.noiseFreqLabel,
+        'noiseFreq':self.noiseFreq,
+        'noiseFreqSeq':self.noiseFreqSeq
+        }
+
+    #Set contextual menu dictionaries
+    def setContextualMenus(self):
+        global circleSettings,rectangleSettings,gratingSettings,noiseSettings,cloudSettings,windmillSettings,annulusSettings,imageSettings,snakeSettings
+        global staticMotionSettings,dynamicModSettings,staticModSettings,windmillMotionSettings,driftGratingMotionSettings,driftMotionSettings
+        global cartesianSettings,cartesianMaskSettings,polarSettings,polarMaskSettings
+
+        circleSettings = {
+        'gratingType':0,
+        'diameter':1,
+        'diameterLabel':1,
+        'diameterSeq':1,
+        'imagePath':0,
+        'innerDiameter':0,
+        'innerDiameterLabel':0,
+        'innerDiameterSeq':0,
+        'outerDiameter':0,
+        'outerDiameterLabel':0,
+        'outerDiameterSeq':0,
         'length':0,
         'lengthLabel':0,
         'lengthSeq':0,
@@ -1128,12 +3076,89 @@ class App(QMainWindow):
         'orientation':0,
         'orientationLabel':0,
         'orientationSeq':0,
+        'angularCyclesLabel':0,
+        'angularCycles':0,
+        'angularCyclesSeq':0,
         'spatialPhase':0,
         'spatialPhaseLabel':0,
         'spatialPhaseSeq':0,
         'spatialFreq':0,
         'spatialFreqLabel':0,
-        'spatialFreqSeq':0
+        'spatialFreqSeq':0,
+        'noiseType':0,
+        'noiseSeedLabel':0,
+        'noiseSeed':0,
+        'noiseSeedSeq':0,
+        'noiseSizeLabel':0,
+        'noiseSize':0,
+        'noiseSizeSeq':0,
+        'noiseFreqLabel':0,
+        'noiseFreq':0,
+        'noiseFreqSeq':0,
+        'cloudSFLabel':0,
+        'cloudSF':0,
+        'cloudSFBand':0,
+        'cloudSpeedLabel':0,
+        'cloudSpeedX':0,
+        'cloudSpeedY':0,
+        'cloudSpeedBandLabel':0,
+        'cloudSpeedBand':0,
+        'cloudOrientLabel':0,
+        'cloudOrient':0,
+        'cloudOrientBand':0,
+        }
+
+        annulusSettings = {
+        'gratingType':0,
+        'diameter':0,
+        'diameterLabel':0,
+        'diameterSeq':0,
+        'imagePath':0,
+        'innerDiameter':1,
+        'innerDiameterLabel':1,
+        'innerDiameterSeq':1,
+        'outerDiameter':1,
+        'outerDiameterLabel':1,
+        'outerDiameterSeq':1,
+        'length':0,
+        'lengthLabel':0,
+        'lengthSeq':0,
+        'width':0,
+        'widthLabel':0,
+        'widthSeq':0,
+        'orientation':0,
+        'orientationLabel':0,
+        'orientationSeq':0,
+        'angularCyclesLabel':0,
+        'angularCycles':0,
+        'angularCyclesSeq':0,
+        'spatialPhase':0,
+        'spatialPhaseLabel':0,
+        'spatialPhaseSeq':0,
+        'spatialFreq':0,
+        'spatialFreqLabel':0,
+        'spatialFreqSeq':0,
+        'noiseType':0,
+        'noiseSeedLabel':0,
+        'noiseSeed':0,
+        'noiseSeedSeq':0,
+        'noiseSizeLabel':0,
+        'noiseSize':0,
+        'noiseSizeSeq':0,
+        'noiseFreqLabel':0,
+        'noiseFreq':0,
+        'noiseFreqSeq':0,
+        'cloudSFLabel':0,
+        'cloudSF':0,
+        'cloudSFBand':0,
+        'cloudSpeedLabel':0,
+        'cloudSpeedX':0,
+        'cloudSpeedY':0,
+        'cloudSpeedBandLabel':0,
+        'cloudSpeedBand':0,
+        'cloudOrientLabel':0,
+        'cloudOrient':0,
+        'cloudOrientBand':0,
         }
 
         rectangleSettings = {
@@ -1141,6 +3166,13 @@ class App(QMainWindow):
         'diameter':0,
         'diameterLabel':0,
         'diameterSeq':0,
+        'imagePath':0,
+        'innerDiameter':0,
+        'innerDiameterLabel':0,
+        'innerDiameterSeq':0,
+        'outerDiameter':0,
+        'outerDiameterLabel':0,
+        'outerDiameterSeq':0,
         'length':1,
         'lengthLabel':1,
         'lengthSeq':1,
@@ -1150,12 +3182,89 @@ class App(QMainWindow):
         'orientation':1,
         'orientationLabel':1,
         'orientationSeq':1,
+        'angularCyclesLabel':0,
+        'angularCycles':0,
+        'angularCyclesSeq':0,
         'spatialPhase':0,
         'spatialPhaseLabel':0,
         'spatialPhaseSeq':0,
         'spatialFreq':0,
         'spatialFreqLabel':0,
-        'spatialFreqSeq':0
+        'spatialFreqSeq':0,
+        'noiseType':0,
+        'noiseSeedLabel':0,
+        'noiseSeed':0,
+        'noiseSeedSeq':0,
+        'noiseSizeLabel':0,
+        'noiseSize':0,
+        'noiseSizeSeq':0,
+        'noiseFreqLabel':0,
+        'noiseFreq':0,
+        'noiseFreqSeq':0,
+        'cloudSFLabel':0,
+        'cloudSF':0,
+        'cloudSFBand':0,
+        'cloudSpeedLabel':0,
+        'cloudSpeedX':0,
+        'cloudSpeedY':0,
+        'cloudSpeedBandLabel':0,
+        'cloudSpeedBand':0,
+        'cloudOrientLabel':0,
+        'cloudOrient':0,
+        'cloudOrientBand':0
+        }
+
+        snakeSettings = {
+        'gratingType':0,
+        'diameter':0,
+        'diameterLabel':0,
+        'diameterSeq':0,
+        'imagePath':0,
+        'innerDiameter':0,
+        'innerDiameterLabel':0,
+        'innerDiameterSeq':0,
+        'outerDiameter':0,
+        'outerDiameterLabel':0,
+        'outerDiameterSeq':0,
+        'length':1,
+        'lengthLabel':1,
+        'lengthSeq':1,
+        'width':1,
+        'widthLabel':1,
+        'widthSeq':1,
+        'orientation':0,
+        'orientationLabel':0,
+        'orientationSeq':0,
+        'angularCyclesLabel':0,
+        'angularCycles':0,
+        'angularCyclesSeq':0,
+        'spatialPhase':0,
+        'spatialPhaseLabel':0,
+        'spatialPhaseSeq':0,
+        'spatialFreq':0,
+        'spatialFreqLabel':0,
+        'spatialFreqSeq':0,
+        'noiseType':0,
+        'noiseSeedLabel':0,
+        'noiseSeed':0,
+        'noiseSeedSeq':0,
+        'noiseSizeLabel':0,
+        'noiseSize':0,
+        'noiseSizeSeq':0,
+        'noiseFreqLabel':0,
+        'noiseFreq':0,
+        'noiseFreqSeq':0,
+        'cloudSFLabel':0,
+        'cloudSF':0,
+        'cloudSFBand':0,
+        'cloudSpeedLabel':0,
+        'cloudSpeedX':0,
+        'cloudSpeedY':0,
+        'cloudSpeedBandLabel':0,
+        'cloudSpeedBand':0,
+        'cloudOrientLabel':0,
+        'cloudOrient':0,
+        'cloudOrientBand':0
         }
 
         gratingSettings = {
@@ -1163,6 +3272,13 @@ class App(QMainWindow):
         'diameter':0,
         'diameterLabel':0,
         'diameterSeq':0,
+        'imagePath':0,
+        'innerDiameter':0,
+        'innerDiameterLabel':0,
+        'innerDiameterSeq':0,
+        'outerDiameter':0,
+        'outerDiameterLabel':0,
+        'outerDiameterSeq':0,
         'length':0,
         'lengthLabel':0,
         'lengthSeq':0,
@@ -1172,12 +3288,291 @@ class App(QMainWindow):
         'orientation':1,
         'orientationLabel':1,
         'orientationSeq':1,
+        'angularCyclesLabel':0,
+        'angularCycles':0,
+        'angularCyclesSeq':0,
+        'spatialPhase':1,
+        'spatialPhaseLabel':1,
+        'spatialPhaseSeq':1,
+        'spatialFreq':1,
+        'spatialFreqLabel':1,
+        'spatialFreqSeq':1,
+        'noiseType':0,
+        'noiseSeedLabel':0,
+        'noiseSeed':0,
+        'noiseSeedSeq':0,
+        'noiseSizeLabel':0,
+        'noiseSize':0,
+        'noiseSizeSeq':0,
+        'noiseFreqLabel':0,
+        'noiseFreq':0,
+        'noiseFreqSeq':0,
+        'cloudSFLabel':0,
+        'cloudSF':0,
+        'cloudSFBand':0,
+        'cloudSpeedLabel':0,
+        'cloudSpeedX':0,
+        'cloudSpeedY':0,
+        'cloudSpeedBandLabel':0,
+        'cloudSpeedBand':0,
+        'cloudOrientLabel':0,
+        'cloudOrient':0,
+        'cloudOrientBand':0,
+        }
+
+        noiseSettings = {
+        'gratingType':0,
+        'diameter':0,
+        'diameterLabel':0,
+        'diameterSeq':0,
+        'imagePath':0,
+        'innerDiameter':0,
+        'innerDiameterLabel':0,
+        'innerDiameterSeq':0,
+        'outerDiameter':0,
+        'outerDiameterLabel':0,
+        'outerDiameterSeq':0,
+>>>>>>> Stashed changes
+        'length':0,
+        'lengthLabel':0,
+        'lengthSeq':0,
+        'width':0,
+        'widthLabel':0,
+        'widthSeq':0,
+        'orientation':0,
+        'orientationLabel':0,
+        'orientationSeq':0,
+<<<<<<< Updated upstream
+=======
+        'angularCyclesLabel':0,
+        'angularCycles':0,
+        'angularCyclesSeq':0,
+>>>>>>> Stashed changes
+        'spatialPhase':0,
+        'spatialPhaseLabel':0,
+        'spatialPhaseSeq':0,
+        'spatialFreq':0,
+        'spatialFreqLabel':0,
+<<<<<<< Updated upstream
+        'spatialFreqSeq':0
+        }
+
+        rectangleSettings = {
+=======
+        'spatialFreqSeq':0,
+        'noiseType':1,
+        'noiseSeedLabel':1,
+        'noiseSeed':1,
+        'noiseSeedSeq':1,
+        'noiseSizeLabel':1,
+        'noiseSize':1,
+        'noiseSizeSeq':1,
+        'noiseFreqLabel':1,
+        'noiseFreq':1,
+        'noiseFreqSeq':1,
+        'cloudSFLabel':0,
+        'cloudSF':0,
+        'cloudSFBand':0,
+        'cloudSpeedLabel':0,
+        'cloudSpeedX':0,
+        'cloudSpeedY':0,
+        'cloudSpeedBandLabel':0,
+        'cloudSpeedBand':0,
+        'cloudOrientLabel':0,
+        'cloudOrient':0,
+        'cloudOrientBand':0,
+        }
+
+        cloudSettings = {
+>>>>>>> Stashed changes
+        'gratingType':0,
+        'diameter':0,
+        'diameterLabel':0,
+        'diameterSeq':0,
+<<<<<<< Updated upstream
+        'length':1,
+        'lengthLabel':1,
+        'lengthSeq':1,
+        'width':1,
+        'widthLabel':1,
+        'widthSeq':1,
+        'orientation':1,
+        'orientationLabel':1,
+        'orientationSeq':1,
+=======
+        'imagePath':0,
+        'innerDiameter':0,
+        'innerDiameterLabel':0,
+        'innerDiameterSeq':0,
+        'outerDiameter':0,
+        'outerDiameterLabel':0,
+        'outerDiameterSeq':0,
+        'length':0,
+        'lengthLabel':0,
+        'lengthSeq':0,
+        'width':0,
+        'widthLabel':0,
+        'widthSeq':0,
+        'orientation':0,
+        'orientationLabel':0,
+        'orientationSeq':0,
+        'angularCyclesLabel':0,
+        'angularCycles':0,
+        'angularCyclesSeq':0,
+        'spatialPhase':0,
+        'spatialPhaseLabel':0,
+        'spatialPhaseSeq':0,
+        'spatialFreq':0,
+        'spatialFreqLabel':0,
+        'spatialFreqSeq':0,
+        'noiseType':0,
+        'noiseSeedLabel':0,
+        'noiseSeed':0,
+        'noiseSeedSeq':0,
+        'noiseSizeLabel':0,
+        'noiseSize':0,
+        'noiseSizeSeq':0,
+        'noiseFreqLabel':0,
+        'noiseFreq':0,
+        'noiseFreqSeq':0,
+        'cloudSFLabel':1,
+        'cloudSF':1,
+        'cloudSFBand':1,
+        'cloudSpeedLabel':1,
+        'cloudSpeedX':1,
+        'cloudSpeedY':1,
+        'cloudSpeedBandLabel':1,
+        'cloudSpeedBand':1,
+        'cloudOrientLabel':1,
+        'cloudOrient':1,
+        'cloudOrientBand':1,
+        }
+
+        windmillSettings = {
+        'gratingType':1,
+        'diameter':0,
+        'diameterLabel':0,
+        'diameterSeq':0,
+        'imagePath':0,
+        'innerDiameter':0,
+        'innerDiameterLabel':0,
+        'innerDiameterSeq':0,
+        'outerDiameter':0,
+        'outerDiameterLabel':0,
+        'outerDiameterSeq':0,
+        'length':0,
+        'lengthLabel':0,
+        'lengthSeq':0,
+        'width':0,
+        'widthLabel':0,
+        'widthSeq':0,
+        'orientation':1,
+        'orientationLabel':1,
+        'orientationSeq':1,
+        'angularCyclesLabel':1,
+        'angularCycles':1,
+        'angularCyclesSeq':1,
+>>>>>>> Stashed changes
+        'spatialPhase':0,
+        'spatialPhaseLabel':0,
+        'spatialPhaseSeq':0,
+        'spatialFreq':0,
+        'spatialFreqLabel':0,
+<<<<<<< Updated upstream
+        'spatialFreqSeq':0
+        }
+
+        gratingSettings = {
+        'gratingType':1,
+        'diameter':0,
+        'diameterLabel':0,
+        'diameterSeq':0,
+=======
+        'spatialFreqSeq':0,
+        'noiseType':0,
+        'noiseSeedLabel':0,
+        'noiseSeed':0,
+        'noiseSeedSeq':0,
+        'noiseSizeLabel':0,
+        'noiseSize':0,
+        'noiseSizeSeq':0,
+        'noiseFreqLabel':0,
+        'noiseFreq':0,
+        'noiseFreqSeq':0,
+        'cloudSFLabel':0,
+        'cloudSF':0,
+        'cloudSFBand':0,
+        'cloudSpeedLabel':0,
+        'cloudSpeedX':0,
+        'cloudSpeedY':0,
+        'cloudSpeedBandLabel':0,
+        'cloudSpeedBand':0,
+        'cloudOrientLabel':0,
+        'cloudOrient':0,
+        'cloudOrientBand':0,
+        }
+
+        imageSettings = {
+        'gratingType':0,
+        'diameter':0,
+        'diameterLabel':0,
+        'diameterSeq':0,
+        'imagePath':1,
+        'innerDiameter':0,
+        'innerDiameterLabel':0,
+        'innerDiameterSeq':0,
+        'outerDiameter':0,
+        'outerDiameterLabel':0,
+        'outerDiameterSeq':0,
+>>>>>>> Stashed changes
+        'length':0,
+        'lengthLabel':0,
+        'lengthSeq':0,
+        'width':0,
+        'widthLabel':0,
+        'widthSeq':0,
+        'orientation':1,
+        'orientationLabel':1,
+        'orientationSeq':1,
+<<<<<<< Updated upstream
         'spatialPhase':1,
         'spatialPhaseLabel':1,
         'spatialPhaseSeq':1,
         'spatialFreq':1,
         'spatialFreqLabel':1,
         'spatialFreqSeq':1
+=======
+        'angularCyclesLabel':0,
+        'angularCycles':0,
+        'angularCyclesSeq':0,
+        'spatialPhase':0,
+        'spatialPhaseLabel':0,
+        'spatialPhaseSeq':0,
+        'spatialFreq':0,
+        'spatialFreqLabel':0,
+        'spatialFreqSeq':0,
+        'noiseType':0,
+        'noiseSeedLabel':0,
+        'noiseSeed':0,
+        'noiseSeedSeq':0,
+        'noiseSizeLabel':0,
+        'noiseSize':0,
+        'noiseSizeSeq':0,
+        'noiseFreqLabel':0,
+        'noiseFreq':0,
+        'noiseFreqSeq':0,
+        'cloudSFLabel':0,
+        'cloudSF':0,
+        'cloudSFBand':0,
+        'cloudSpeedLabel':0,
+        'cloudSpeedX':0,
+        'cloudSpeedY':0,
+        'cloudSpeedBandLabel':0,
+        'cloudSpeedBand':0,
+        'cloudOrientLabel':0,
+        'cloudOrient':0,
+        'cloudOrientBand':0,
+>>>>>>> Stashed changes
         }
 
         driftMotionSettings = {
@@ -1190,6 +3585,45 @@ class App(QMainWindow):
         'speed':1,
         'speedLabel':1,
         'speedSeq':1,
+<<<<<<< Updated upstream
+=======
+        'driftFreqLabel':0,
+        'driftFreq':0,
+        'driftFreqSeq':0,
+        'turnDirection':0
+        }
+
+        driftGratingMotionSettings = {
+        'angle':1,
+        'angleLabel':1,
+        'angleSeq':1,
+        'startRad':0,
+        'startRadLabel':0,
+        'startRadSeq':0,
+        'speed':0,
+        'speedLabel':0,
+        'speedSeq':0,
+        'driftFreq':1,
+        'driftFreqLabel':1,
+        'driftFreqSeq':1,
+        'turnDirection':0
+        }
+
+        windmillMotionSettings = {
+        'angle':0,
+        'angleLabel':0,
+        'angleSeq':0,
+        'startRad':0,
+        'startRadLabel':0,
+        'startRadSeq':0,
+        'speed':0,
+        'speedLabel':0,
+        'speedSeq':0,
+        'driftFreqLabel':1,
+        'driftFreq':1,
+        'driftFreqSeq':1,
+        'turnDirection':1
+>>>>>>> Stashed changes
         }
 
         staticMotionSettings = {
@@ -1202,6 +3636,13 @@ class App(QMainWindow):
         'speed':0,
         'speedLabel':0,
         'speedSeq':0,
+<<<<<<< Updated upstream
+=======
+        'driftFreqLabel':0,
+        'driftFreq':0,
+        'driftFreqSeq':0,
+        'turnDirection':0
+>>>>>>> Stashed changes
         }
 
         staticModSettings = {
@@ -1215,16 +3656,91 @@ class App(QMainWindow):
         'modulationFreqLabel':1,
         'modulationFreqSeq':1
         }
+<<<<<<< Updated upstream
+=======
+
+        cartesianSettings ={
+        'xPos':1,
+        'xPosLabel':1,
+        'xPosSeq':1,
+        'yPos':1,
+        'yPosLabel':1,
+        'yPosSeq':1,
+        'polarRadius':0,
+        'polarRadiusLabel':0,
+        'polarRadiusSeq':0,
+        'polarAngle':0,
+        'polarAngleLabel':0,
+        'polarAngleSeq':0
+        }
+
+        polarSettings ={
+        'xPos':0,
+        'xPosLabel':0,
+        'xPosSeq':0,
+        'yPos':0,
+        'yPosLabel':0,
+        'yPosSeq':0,
+        'polarRadius':1,
+        'polarRadiusLabel':1,
+        'polarRadiusSeq':1,
+        'polarAngle':1,
+        'polarAngleLabel':1,
+        'polarAngleSeq':1
+        }
+
+        cartesianMaskSettings ={
+        'maskXPos':1,
+        'maskXPosLabel':1,
+        'maskXPosSeq':1,
+        'maskYPos':1,
+        'maskYPosLabel':1,
+        'maskYPosSeq':1,
+        'maskPolarRadius':0,
+        'maskPolarRadiusLabel':0,
+        'maskPolarRadiusSeq':0,
+        'maskPolarAngle':0,
+        'maskPolarAngleLabel':0,
+        'maskPolarAngleSeq':0
+        }
+
+        polarMaskSettings ={
+        'maskXPos':0,
+        'maskXPosLabel':0,
+        'maskXPosSeq':0,
+        'maskYPos':0,
+        'maskYPosLabel':0,
+        'maskYPosSeq':0,
+        'maskPolarRadius':1,
+        'maskPolarRadiusLabel':1,
+        'maskPolarRadiusSeq':1,
+        'maskPolarAngle':1,
+        'maskPolarAngleLabel':1,
+        'maskPolarAngleSeq':1
+        }
+>>>>>>> Stashed changes
 
     #Design Panel
     def buildDesignPanel(self):
-        left = 165
-        top = 300
-        width = 475
-        height = 400
+        left = 165 * scale_w
+        top = 300 * scale_h
+        width = 475 * scale_w
+        height = 400 * scale_h
 
+<<<<<<< Updated upstream
         bold = QtGui.QFont("Helvetica", 14,weight=QtGui.QFont.Normal)
         large = QtGui.QFont("Helvetica", 13)
+=======
+        if system == 'Windows':
+            #fonts
+            bold = QtGui.QFont("Roboto Light", 10,weight=QtGui.QFont.Bold)
+            large = QtGui.QFont("Roboto Light", 11,weight=QtGui.QFont.Light)
+        elif system == 'Darwin':
+            #fonts
+            bold = QtGui.QFont("Helvetica", 14,weight=QtGui.QFont.Normal)
+            large = QtGui.QFont("Helvetica", 13)
+
+>>>>>>> Stashed changes
 
         #Group box and designPanelLayout layout
         self.designPanel = QGroupBox(self)
@@ -1233,14 +3749,18 @@ class App(QMainWindow):
         self.designPanel.setLayout(self.designPanelLayout)
         self.designPanel.move(left,top)
         self.designPanel.resize(width,height)
+<<<<<<< Updated upstream
         self.designPanelLayout.setVerticalSpacing(5)
+=======
+        self.designPanelLayout.setVerticalSpacing(5* scale_w)
+>>>>>>> Stashed changes
 
         #Blanks
         self.blank1 = QLabel('',self)
         self.blank2 = QLabel('',self)
-        self.blank2.setFixedWidth(15)
+        self.blank2.setFixedWidth(15* scale_w)
         self.blank3 = QLabel('',self)
-        self.blank3.setFixedWidth(15)
+        self.blank3.setFixedWidth(15* scale_w)
         self.blank4 = QLabel('',self)
         self.blank5 = QLabel('',self)
         self.blank6 = QLabel('',self)
@@ -1261,21 +3781,44 @@ class App(QMainWindow):
         self.objectListBox.setCurrentRow(0)
         self.objectListBox.setSelectionMode(1)
         self.objectListBox.itemClicked.connect(lambda: self.listProc('objectListBox',self.objectListBox.currentRow()))
+<<<<<<< Updated upstream
 
         #insert blank after the object list box row
         self.blank1.setFixedHeight(20)
+=======
+
+        #set up drag and drop to reorder stimulu items
+        self.objectListBox.setDragDropMode(QAbstractItemView.InternalMove) #only allows internal drag/drops
+        self.objectListBox.setDragDropOverwriteMode(False)
+        self.objectListBox.setAcceptDrops(True)
+        self.objectListBox.setDropIndicatorShown(True)
+        self.objectListBox.setDragEnabled(True)
+
+
+        #insert blank after the object list box row
+        self.blank1.setFixedHeight(20 * scale_h)
+>>>>>>> Stashed changes
         self.designPanelLayout.addWidget(self.blank1,4,0,1,11)
         self.designPanelLayout.setRowStretch(14,1)
         self.blank1.setAlignment(QtCore.Qt.AlignVCenter)
 
         #Object Type
-        self.objectTypeLabel = QLabel('Type',self)
+        self.objectTypeLabel = QLabel('Objects',self)
         self.objectTypeLabel.setFont(bold)
+<<<<<<< Updated upstream
         self.objectTypeLabel.setFixedHeight(20)
 
         self.objectType = QComboBox(self)
         self.objectType.addItems(['Circle','Rectangle','Grating','Cloud'])
         self.objectType.activated.connect(lambda: self.menuProc('objectType',self.objectType.currentText()))
+=======
+        self.objectTypeLabel.setFixedHeight(20 * scale_h)
+
+        self.objectType = QComboBox(self)
+        self.objectType.addItems(['Circle','Rectangle','Grating','Noise','Cloud','Windmill','Annulus','Snake','Image'])
+        self.objectType.activated.connect(lambda: self.menuProc('objectType',self.objectType.currentText()))
+        self.objectType.setFixedHeight(20 * scale_h)
+>>>>>>> Stashed changes
 
         self.designPanelLayout.addWidget(self.objectTypeLabel,5,0)
         self.designPanelLayout.addWidget(self.objectType,6,0,1,2)
@@ -1283,14 +3826,23 @@ class App(QMainWindow):
         #Add blank slot to the right of the object type menu
         self.designPanelLayout.addWidget(self.blank2,7,3)
         #self.blank2.setStyleSheet("QLabel {background-color: blue;}")
+<<<<<<< Updated upstream
         self.blank2.setFixedHeight(20)
+=======
+        self.blank2.setFixedHeight(20 * scale_h)
+        #self.blank2.setFixedWidth(20 * scale_h)
+>>>>>>> Stashed changes
         self.blank2.setAlignment(QtCore.Qt.AlignVCenter)
 
         #Coordinates
         self.coordinateLabel = QLabel('Coordinates')
         self.coordinateLabel.setFont(bold)
         self.coordinateType = QComboBox()
+<<<<<<< Updated upstream
         self.coordinateType.setFixedHeight(20)
+=======
+        self.coordinateType.setFixedHeight(20 * scale_h)
+>>>>>>> Stashed changes
         self.coordinateType.addItems(['Cartesian','Polar'])
         self.coordinateType.activated.connect(lambda: self.menuProc('coordinateType',self.coordinateType.currentText()))
 
@@ -1302,10 +3854,14 @@ class App(QMainWindow):
         self.xPosLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.xPos = QLineEdit()
         self.xPos.setAlignment(QtCore.Qt.AlignRight)
-        self.xPos.setFixedWidth(40)
+        self.xPos.setFixedWidth(40 * scale_w)
         self.xPosSeq = QComboBox()
         self.xPosSeq.addItem('None')
+<<<<<<< Updated upstream
         self.xPosSeq.setFixedWidth(20)
+=======
+        self.xPosSeq.setFixedWidth(20 * scale_w)
+>>>>>>> Stashed changes
         self.xPos.editingFinished.connect(lambda: self.variableProc('xPos',self.xPos.text()))
         self.xPosSeq.activated.connect(lambda: self.menuProc('xPosSeq',self.xPosSeq.currentText()))
 
@@ -1318,25 +3874,65 @@ class App(QMainWindow):
         self.yPosLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.yPos = QLineEdit()
         self.yPos.setAlignment(QtCore.Qt.AlignRight)
-        self.yPos.setFixedWidth(40)
+        self.yPos.setFixedWidth(40 * scale_w)
         self.yPosSeq = QComboBox()
         self.yPosSeq.addItem('None')
+<<<<<<< Updated upstream
         self.yPosSeq.setFixedWidth(20)
+=======
+        self.yPosSeq.setFixedWidth(20 * scale_w)
+>>>>>>> Stashed changes
         self.yPos.editingFinished.connect(lambda: self.variableProc('yPos',self.yPos.text()))
         self.yPosSeq.activated.connect(lambda: self.menuProc('yPosSeq',self.yPosSeq.currentText()))
 
         self.designPanelLayout.addWidget(self.yPosLabel,3,8)
         self.designPanelLayout.addWidget(self.yPos,3,9)
         self.designPanelLayout.addWidget(self.yPosSeq,3,10)
+<<<<<<< Updated upstream
+=======
+
+        #Polar Coordinates - Radius
+        self.polarRadiusLabel = QLabel('Radius')
+        self.polarRadiusLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.polarRadius = QLineEdit()
+        self.polarRadius.setAlignment(QtCore.Qt.AlignRight)
+        self.polarRadius.setFixedWidth(40 * scale_w)
+        self.polarRadiusSeq = QComboBox()
+        self.polarRadiusSeq.addItem('None')
+        self.polarRadiusSeq.setFixedWidth(20 * scale_w)
+        self.polarRadius.editingFinished.connect(lambda: self.variableProc('polarRadius',self.polarRadius.text()))
+        self.polarRadiusSeq.activated.connect(lambda: self.menuProc('polarRadiusSeq',self.polarRadiusSeq.currentText()))
+
+        self.designPanelLayout.addWidget(self.polarRadiusLabel,2,8)
+        self.designPanelLayout.addWidget(self.polarRadius,2,9)
+        self.designPanelLayout.addWidget(self.polarRadiusSeq,2,10)
+
+        #Polar Coordinates - Angle
+        self.polarAngleLabel = QLabel('Angle')
+        self.polarAngleLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.polarAngle = QLineEdit()
+        self.polarAngle.setAlignment(QtCore.Qt.AlignRight)
+        self.polarAngle.setFixedWidth(40 * scale_w)
+        self.polarAngleSeq = QComboBox()
+        self.polarAngleSeq.addItem('None')
+        self.polarAngleSeq.setFixedWidth(20 * scale_w)
+        self.polarAngle.editingFinished.connect(lambda: self.variableProc('polarAngle',self.polarAngle.text()))
+        self.polarAngleSeq.activated.connect(lambda: self.menuProc('polarAngleSeq',self.polarAngleSeq.currentText()))
+
+        self.designPanelLayout.addWidget(self.polarAngleLabel,3,8)
+        self.designPanelLayout.addWidget(self.polarAngle,3,9)
+        self.designPanelLayout.addWidget(self.polarAngleSeq,3,10)
+>>>>>>> Stashed changes
 
         #Diameter
         self.diameterLabel = QLabel('Diameter',self)
         self.diameterLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.diameter = QLineEdit(self)
-        self.diameter.setFixedWidth(40)
+        self.diameter.setFixedWidth(40 * scale_w)
         self.diameter.setAlignment(QtCore.Qt.AlignRight)
         self.diameterSeq = QComboBox(self)
         self.diameterSeq.addItem('None')
+<<<<<<< Updated upstream
         self.diameterSeq.setFixedWidth(20)
         self.diameter.editingFinished.connect(lambda: self.variableProc('diameter',self.diameter.text()))
         self.diameterSeq.activated.connect(lambda: self.menuProc('diameterSeq',self.diameterSeq.currentText()))
@@ -1350,16 +3946,200 @@ class App(QMainWindow):
         self.gratingType.addItems(['Square','Sine'])
         self.designPanelLayout.addWidget(self.gratingType,7,0,1,2)
         self.gratingType.activated.connect(lambda: self.menuProc('gratingType',self.gratingType.currentText()))
+=======
+        self.diameterSeq.setFixedWidth(20 * scale_w)
+        self.diameter.editingFinished.connect(lambda: self.variableProc('diameter',self.diameter.text()))
+        self.diameterSeq.activated.connect(lambda: self.menuProc('diameterSeq',self.diameterSeq.currentText()))
+
+        self.designPanelLayout.addWidget(self.diameterLabel,7,0)
+        self.designPanelLayout.addWidget(self.diameter,7,1)
+        self.designPanelLayout.addWidget(self.diameterSeq,7,2)
+
+        #Image Path
+        self.imagePath =QComboBox(self)
+        self.imagePath.setFixedHeight(20 * scale_h)
+
+        self.designPanelLayout.addWidget(self.imagePath,7,0,1,2)
+
+        #Inner Diameter (annulus)
+        self.innerDiameterLabel = QLabel('Inner',self)
+        self.innerDiameterLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.innerDiameter = QLineEdit(self)
+        self.innerDiameter.setFixedWidth(40 * scale_w)
+        self.innerDiameter.setAlignment(QtCore.Qt.AlignRight)
+        self.innerDiameterSeq = QComboBox(self)
+        self.innerDiameterSeq.addItem('None')
+        self.innerDiameterSeq.setFixedWidth(20 * scale_w)
+        self.innerDiameter.editingFinished.connect(lambda: self.variableProc('innerDiameter',self.innerDiameter.text()))
+        self.innerDiameterSeq.activated.connect(lambda: self.menuProc('innerDiameterSeq',self.innerDiameterSeq.currentText()))
+
+        self.designPanelLayout.addWidget(self.innerDiameterLabel,7,0)
+        self.designPanelLayout.addWidget(self.innerDiameter,7,1)
+        self.designPanelLayout.addWidget(self.innerDiameterSeq,7,2)
+
+        #Outer Diameter (annulus)
+        self.outerDiameterLabel = QLabel('Outer',self)
+        self.outerDiameterLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.outerDiameter = QLineEdit(self)
+        self.outerDiameter.setFixedWidth(40 * scale_w)
+        self.outerDiameter.setAlignment(QtCore.Qt.AlignRight)
+        self.outerDiameterSeq = QComboBox(self)
+        self.outerDiameterSeq.addItem('None')
+        self.outerDiameterSeq.setFixedWidth(20 * scale_w)
+        self.outerDiameter.editingFinished.connect(lambda: self.variableProc('outerDiameter',self.outerDiameter.text()))
+        self.outerDiameterSeq.activated.connect(lambda: self.menuProc('outerDiameterSeq',self.outerDiameterSeq.currentText()))
+
+        self.designPanelLayout.addWidget(self.outerDiameterLabel,8,0)
+        self.designPanelLayout.addWidget(self.outerDiameter,8,1)
+        self.designPanelLayout.addWidget(self.outerDiameterSeq,8,2)
+
+        #Grating type
+        self.gratingType = QComboBox(self)
+        self.gratingType.addItems(['Square','Sine','Plaid'])
+        self.designPanelLayout.addWidget(self.gratingType,7,0,1,2)
+        self.gratingType.activated.connect(lambda: self.menuProc('gratingType',self.gratingType.currentText()))
+
+        #Noise Type
+        self.noiseType = QComboBox(self)
+        self.noiseType.addItems(['Binary','Normal','Uniform'])
+        self.designPanelLayout.addWidget(self.noiseType,7,0,1,2)
+        self.noiseType.activated.connect(lambda: self.menuProc('noiseType',self.noiseType.currentText()))
+
+        #Noise Seed
+        self.noiseSeedLabel = QLabel('Seed',self)
+        self.noiseSeedLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.noiseSeed = QLineEdit(self)
+        self.noiseSeed.setFixedWidth(40 * scale_w)
+        self.noiseSeed.setAlignment(QtCore.Qt.AlignRight)
+        self.noiseSeed.editingFinished.connect(lambda: self.variableProc('noiseSeed',self.noiseSeed.text()))
+
+        self.noiseSeedSeq = QComboBox(self)
+        self.noiseSeedSeq.addItem('None')
+        self.noiseSeedSeq.setFixedWidth(20 * scale_w)
+        self.noiseSeedSeq.activated.connect(lambda: self.menuProc('noiseSeedSeq',self.noiseSeedSeq.currentText()))
+
+        #Noise pixel size
+        self.noiseSizeLabel = QLabel('Size',self)
+        self.noiseSizeLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.noiseSize = QLineEdit(self)
+        self.noiseSize.setFixedWidth(40 * scale_w)
+        self.noiseSize.setAlignment(QtCore.Qt.AlignRight)
+        self.noiseSize.editingFinished.connect(lambda: self.variableProc('noiseSize',self.noiseSize.text()))
+
+        self.noiseSizeSeq = QComboBox(self)
+        self.noiseSizeSeq.addItem('None')
+        self.noiseSizeSeq.setFixedWidth(20 * scale_w)
+        self.noiseSizeSeq.activated.connect(lambda: self.menuProc('noiseSizeSeq',self.noiseSizeSeq.currentText()))
+
+        self.designPanelLayout.addWidget(self.noiseSeedLabel,8,0)
+        self.designPanelLayout.addWidget(self.noiseSeed,8,1)
+        self.designPanelLayout.addWidget(self.noiseSeedSeq,8,2)
+
+        self.designPanelLayout.addWidget(self.noiseSizeLabel,9,0)
+        self.designPanelLayout.addWidget(self.noiseSize,9,1)
+        self.designPanelLayout.addWidget(self.noiseSizeSeq,9,2)
+
+        #Noise frequency
+        self.noiseFreqLabel = QLabel('Freq.',self)
+        self.noiseFreqLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.noiseFreq = QLineEdit(self)
+        self.noiseFreq.setFixedWidth(40 * scale_w)
+        self.noiseFreq.setAlignment(QtCore.Qt.AlignRight)
+        self.noiseFreq.editingFinished.connect(lambda: self.variableProc('noiseFreq',self.noiseFreq.text()))
+
+        self.noiseFreqSeq = QComboBox(self)
+        self.noiseFreqSeq.addItem('None')
+        self.noiseFreqSeq.setFixedWidth(20 * scale_w)
+        self.noiseFreqSeq.activated.connect(lambda: self.menuProc('noiseFreqSeq',self.noiseFreqSeq.currentText()))
+
+        self.designPanelLayout.addWidget(self.noiseFreqLabel,10,0)
+        self.designPanelLayout.addWidget(self.noiseFreq,10,1)
+        self.designPanelLayout.addWidget(self.noiseFreqSeq,10,2)
+
+        #Cloud parameters
+
+        #Cloud - Spatial Frequency and Bandwidth
+        self.cloudSFLabel = QLabel('SF / BW',self)
+        self.cloudSF = QLineEdit(self)
+        self.cloudSFBand = QLineEdit(self)
+
+        self.cloudSFBand.setFixedWidth(40 * scale_w)
+        self.cloudSF.setFixedWidth(40 * scale_w)
+
+        self.cloudSFLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.cloudSF.setAlignment(QtCore.Qt.AlignRight)
+        self.cloudSFBand.setAlignment(QtCore.Qt.AlignRight)
+
+        self.designPanelLayout.addWidget(self.cloudSFLabel,7,0)
+        self.designPanelLayout.addWidget(self.cloudSF,7,1)
+        self.designPanelLayout.addWidget(self.cloudSFBand,7,2,1,2)
+
+        self.cloudSF.editingFinished.connect(lambda: self.variableProc('cloudSF',self.cloudSF.text()))
+        self.cloudSFBand.editingFinished.connect(lambda: self.variableProc('cloudSFBand',self.cloudSFBand.text()))
+
+        #Cloud - Temporal Frequency and Bandwidth
+        self.cloudSpeedLabel = QLabel('TF X/Y',self)
+        self.cloudSpeedX = QLineEdit(self)
+        self.cloudSpeedY = QLineEdit(self)
+
+        self.cloudSpeedX.setFixedWidth(40 * scale_w)
+        self.cloudSpeedY.setFixedWidth(40 * scale_w)
+
+        self.cloudSpeedLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.cloudSpeedX.setAlignment(QtCore.Qt.AlignRight)
+        self.cloudSpeedY.setAlignment(QtCore.Qt.AlignRight)
+
+        self.designPanelLayout.addWidget(self.cloudSpeedLabel,8,0)
+        self.designPanelLayout.addWidget(self.cloudSpeedX,8,1)
+        self.designPanelLayout.addWidget(self.cloudSpeedY,8,2,1,2)
+
+        self.cloudSpeedX.editingFinished.connect(lambda: self.variableProc('cloudSpeedX',self.cloudSpeedX.text()))
+        self.cloudSpeedY.editingFinished.connect(lambda: self.variableProc('cloudSpeedY',self.cloudSpeedY.text()))
+
+        self.cloudSpeedBandLabel = QLabel('TF BW',self)
+        self.cloudSpeedBand = QLineEdit(self)
+        self.cloudSpeedBand.setFixedWidth(40 * scale_w)
+        self.cloudSpeedBandLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.cloudSpeedBand.setAlignment(QtCore.Qt.AlignRight)
+
+        self.designPanelLayout.addWidget(self.cloudSpeedBandLabel,9,0)
+        self.designPanelLayout.addWidget(self.cloudSpeedBand,9,1)
+
+        self.cloudSpeedBand.editingFinished.connect(lambda: self.variableProc('cloudSpeedBand',self.cloudSpeedBand.text()))
+
+        #Cloud - Orientation and Bandwidth
+        self.cloudOrientLabel = QLabel('Ang./BW',self)
+        self.cloudOrient = QLineEdit(self)
+        self.cloudOrientBand = QLineEdit(self)
+
+        self.cloudOrientBand.setFixedWidth(40 * scale_w)
+        self.cloudOrient.setFixedWidth(40 * scale_w)
+
+        self.cloudOrientLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.cloudOrient.setAlignment(QtCore.Qt.AlignRight)
+        self.cloudOrientBand.setAlignment(QtCore.Qt.AlignRight)
+
+        self.designPanelLayout.addWidget(self.cloudOrientLabel,10,0)
+        self.designPanelLayout.addWidget(self.cloudOrient,10,1)
+        self.designPanelLayout.addWidget(self.cloudOrientBand,10,2,1,2)
+
+        self.cloudOrient.editingFinished.connect(lambda: self.variableProc('cloudOrient',self.cloudOrient.text()))
+        self.cloudOrientBand.editingFinished.connect(lambda: self.variableProc('cloudOrientBand',self.cloudOrientBand.text()))
+>>>>>>> Stashed changes
 
         #Length
         self.lengthLabel = QLabel('Length',self)
         self.lengthLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.length = QLineEdit(self)
-        self.length.setFixedWidth(40)
+        self.length.setFixedWidth(40 * scale_w)
         self.length.setAlignment(QtCore.Qt.AlignRight)
         self.lengthSeq = QComboBox(self)
         self.lengthSeq.addItem('None')
+<<<<<<< Updated upstream
         self.lengthSeq.setFixedWidth(20)
+=======
+        self.lengthSeq.setFixedWidth(20 * scale_w)
+>>>>>>> Stashed changes
         self.length.editingFinished.connect(lambda: self.variableProc('length',self.length.text()))
         self.lengthSeq.activated.connect(lambda: self.menuProc('lengthSeq',self.lengthSeq.currentText()))
 
@@ -1371,11 +4151,15 @@ class App(QMainWindow):
         self.widthLabel = QLabel('Width',self)
         self.widthLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.width = QLineEdit(self)
-        self.width.setFixedWidth(40)
+        self.width.setFixedWidth(40 * scale_w)
         self.width.setAlignment(QtCore.Qt.AlignRight)
         self.widthSeq = QComboBox(self)
         self.widthSeq.addItem('None')
+<<<<<<< Updated upstream
         self.widthSeq.setFixedWidth(20)
+=======
+        self.widthSeq.setFixedWidth(20 * scale_w)
+>>>>>>> Stashed changes
         self.width.editingFinished.connect(lambda: self.variableProc('width',self.width.text()))
         self.widthSeq.activated.connect(lambda: self.menuProc('widthSeq',self.widthSeq.currentText()))
 
@@ -1387,11 +4171,15 @@ class App(QMainWindow):
         self.spatialFreqLabel = QLabel('Sp. Freq.',self)
         self.spatialFreqLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.spatialFreq = QLineEdit(self)
-        self.spatialFreq.setFixedWidth(40)
+        self.spatialFreq.setFixedWidth(40 * scale_w)
         self.spatialFreq.setAlignment(QtCore.Qt.AlignRight)
         self.spatialFreqSeq = QComboBox(self)
         self.spatialFreqSeq.addItem('None')
+<<<<<<< Updated upstream
         self.spatialFreqSeq.setFixedWidth(20)
+=======
+        self.spatialFreqSeq.setFixedWidth(20 * scale_w)
+>>>>>>> Stashed changes
         self.spatialFreq.editingFinished.connect(lambda: self.variableProc('spatialFreq',self.spatialFreq.text()))
         self.spatialFreqSeq.activated.connect(lambda: self.menuProc('spatialFreqSeq',self.spatialFreqSeq.currentText()))
 
@@ -1404,9 +4192,16 @@ class App(QMainWindow):
         self.orientationLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.orientation = QLineEdit(self)
         self.orientation.setAlignment(QtCore.Qt.AlignRight)
+<<<<<<< Updated upstream
         self.orientationSeq = QComboBox(self)
         self.orientationSeq.addItem('None')
         self.orientationSeq.setFixedWidth(20)
+=======
+        self.orientation.setFixedWidth(40 * scale_w)
+        self.orientationSeq = QComboBox(self)
+        self.orientationSeq.addItem('None')
+        self.orientationSeq.setFixedWidth(20 * scale_w)
+>>>>>>> Stashed changes
         self.orientation.editingFinished.connect(lambda: self.variableProc('orientation',self.orientation.text()))
         self.orientationSeq.activated.connect(lambda: self.menuProc('orientationSeq',self.orientationSeq.currentText()))
 
@@ -1419,15 +4214,41 @@ class App(QMainWindow):
         self.spatialPhaseLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.spatialPhase = QLineEdit(self)
         self.spatialPhase.setAlignment(QtCore.Qt.AlignRight)
+<<<<<<< Updated upstream
         self.spatialPhaseSeq = QComboBox(self)
         self.spatialPhaseSeq.addItem('None')
         self.spatialPhaseSeq.setFixedWidth(20)
+=======
+        self.spatialPhase.setFixedWidth(40 * scale_w)
+        self.spatialPhaseSeq = QComboBox(self)
+        self.spatialPhaseSeq.addItem('None')
+        self.spatialPhaseSeq.setFixedWidth(20 * scale_w)
+>>>>>>> Stashed changes
         self.spatialPhase.editingFinished.connect(lambda: self.variableProc('spatialPhase',self.spatialPhase.text()))
         self.spatialPhaseSeq.activated.connect(lambda: self.menuProc('spatialPhaseSeq',self.spatialPhaseSeq.currentText()))
 
         self.designPanelLayout.addWidget(self.spatialPhaseLabel,9,0)
         self.designPanelLayout.addWidget(self.spatialPhase,9,1)
         self.designPanelLayout.addWidget(self.spatialPhaseSeq,9,2)
+<<<<<<< Updated upstream
+=======
+
+        #angular cycles
+        self.angularCyclesLabel = QLabel('Cycles',self)
+        self.angularCycles = QLineEdit(self)
+        self.angularCyclesLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.angularCycles.setAlignment(QtCore.Qt.AlignRight)
+        self.angularCycles.setFixedWidth(40 * scale_w)
+        self.angularCyclesSeq = QComboBox(self)
+        self.angularCyclesSeq.addItem('None')
+        self.angularCyclesSeq.setFixedWidth(20 * scale_w)
+        self.angularCycles.editingFinished.connect(lambda: self.variableProc('angularCycles',self.angularCycles.text()))
+        self.angularCyclesSeq.activated.connect(lambda: self.menuProc('angularCyclesSeq',self.angularCyclesSeq.currentText()))
+
+        self.designPanelLayout.addWidget(self.angularCyclesLabel,8,0)
+        self.designPanelLayout.addWidget(self.angularCycles,8,1)
+        self.designPanelLayout.addWidget(self.angularCyclesSeq,8,2)
+>>>>>>> Stashed changes
 
         #Contrast
         self.contrastTypeLabel = QLabel('Contrast',self)
@@ -1435,15 +4256,27 @@ class App(QMainWindow):
         self.contrastType = QComboBox(self)
         self.contrastType.addItems(['Weber','Michelson','Intensity'])
         self.contrastType.activated.connect(lambda: self.menuProc('contrastType',self.contrastType.currentText()))
+<<<<<<< Updated upstream
 
         self.contrastLabel = QLabel('% Contrast',self)
         self.contrastLabel.setFixedHeight(20)
+=======
+        self.contrastType.setFixedHeight(20 * scale_h)
+
+        self.contrastLabel = QLabel('% Contrast',self)
+        self.contrastLabel.setFixedHeight(20 * scale_h)
+        self.contrastLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+>>>>>>> Stashed changes
         self.contrast = QLineEdit(self)
         self.contrast.setAlignment(QtCore.Qt.AlignRight)
-        self.contrast.setFixedWidth(40)
+        self.contrast.setFixedWidth(40 * scale_w)
         self.contrastSeq = QComboBox(self)
         self.contrastSeq.addItem('None')
+<<<<<<< Updated upstream
         self.contrastSeq.setFixedWidth(20)
+=======
+        self.contrastSeq.setFixedWidth(20 * scale_w)
+>>>>>>> Stashed changes
         self.contrast.editingFinished.connect(lambda: self.variableProc('contrast',self.contrast.text()))
         self.contrastSeq.activated.connect(lambda: self.menuProc('contrastSeq',self.contrastSeq.currentText()))
 
@@ -1456,26 +4289,42 @@ class App(QMainWindow):
         #Add blank slot to the right of the contrast edit box
         self.designPanelLayout.addWidget(self.blank3,7,7)
         #self.blank3.setStyleSheet("QLabel {background-color: blue;}")
+<<<<<<< Updated upstream
         self.blank3.setFixedHeight(20)
+=======
+        self.blank3.setFixedHeight(20 * scale_h)
+>>>>>>> Stashed changes
         self.blank3.setAlignment(QtCore.Qt.AlignVCenter)
 
         #Modulation
         self.modulationTypeLabel = QLabel('Modulation',self)
         self.modulationTypeLabel.setFont(bold)
+<<<<<<< Updated upstream
         self.modulationTypeLabel.setFixedHeight(20)
         self.modulationType = QComboBox(self)
         self.modulationType.activated.connect(lambda: self.menuProc('modulationType',self.modulationType.currentText()))
 
         self.modulationType.addItems(['Static','Square','Sine'])
+=======
+        self.modulationTypeLabel.setFixedHeight(20 * scale_h)
+        self.modulationType = QComboBox(self)
+        self.modulationType.activated.connect(lambda: self.menuProc('modulationType',self.modulationType.currentText()))
+        self.modulationType.setFixedHeight(20 * scale_h)
+        self.modulationType.addItems(['Static','Square','Sine','Chirp'])
+>>>>>>> Stashed changes
 
         self.modulationFreqLabel = QLabel('Frequency',self)
         self.modulationFreq =  QLineEdit(self)
-        self.modulationFreq.setFixedWidth(40)
+        self.modulationFreq.setFixedWidth(40 * scale_w)
         self.modulationFreq.setAlignment(QtCore.Qt.AlignRight)
         self.modulationFreqLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.modulationFreqSeq = QComboBox(self)
         self.modulationFreqSeq.addItem('None')
+<<<<<<< Updated upstream
         self.modulationFreqSeq.setFixedWidth(20)
+=======
+        self.modulationFreqSeq.setFixedWidth(20 * scale_w)
+>>>>>>> Stashed changes
         self.modulationFreq.editingFinished.connect(lambda: self.variableProc('modulationFreq',self.modulationFreq.text()))
         self.modulationFreqSeq.activated.connect(lambda: self.menuProc('modulationFreqSeq',self.modulationFreqSeq.currentText()))
 
@@ -1488,6 +4337,7 @@ class App(QMainWindow):
         #Motion Type
         self.motionTypeLabel = QLabel('Motion',self)
         self.motionTypeLabel.setFont(bold)
+<<<<<<< Updated upstream
         self.motionTypeLabel.setFixedHeight(20)
         self.motionType = QComboBox(self)
         self.motionType.activated.connect(lambda: self.menuProc('motionType',self.motionType.currentText()))
@@ -1495,32 +4345,77 @@ class App(QMainWindow):
 
         self.designPanelLayout.addWidget(self.motionTypeLabel,5,8)
         self.designPanelLayout.addWidget(self.motionType,6,8,1,2)
+=======
+        self.motionTypeLabel.setFixedHeight(20 * scale_h)
+        self.motionType = QComboBox(self)
+        self.motionType.activated.connect(lambda: self.menuProc('motionType',self.motionType.currentText()))
+        self.motionType.addItems(['Static','Drift'])
+        self.motionType.setFixedHeight(20 * scale_h)
+
+        self.designPanelLayout.addWidget(self.motionTypeLabel,5,8)
+        self.designPanelLayout.addWidget(self.motionType,6,8,1,2)
+
+        #Clockwise/counterclockwise drift option (for spinning windmill)
+        self.turnDirection = QComboBox(self)
+        self.turnDirection.activated.connect(lambda: self.menuProc('turnDirection',self.turnDirection.currentText()))
+        self.turnDirection.addItems(['Clockwise','Counterclockwise'])
+        self.turnDirection.setFixedHeight(20 * scale_h)
+
+        self.designPanelLayout.addWidget(self.turnDirection,7,8,1,2)
+>>>>>>> Stashed changes
 
         #Speed
         self.speedLabel = QLabel('Speed',self)
         self.speedLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.speed = QLineEdit(self)
-        self.speed.setFixedWidth(40)
+        self.speed.setFixedWidth(40 * scale_w)
         self.speed.setAlignment(QtCore.Qt.AlignRight)
         self.speedSeq = QComboBox(self)
         self.speedSeq.addItem('None')
+<<<<<<< Updated upstream
         self.speedSeq.setFixedWidth(20)
+=======
+        self.speedSeq.setFixedWidth(20 * scale_w)
+>>>>>>> Stashed changes
         self.speed.editingFinished.connect(lambda: self.variableProc('speed',self.speed.text()))
         self.speedSeq.activated.connect(lambda: self.menuProc('speedSeq',self.speedSeq.currentText()))
 
         self.designPanelLayout.addWidget(self.speedLabel,7,8)
         self.designPanelLayout.addWidget(self.speed,7,9)
         self.designPanelLayout.addWidget(self.speedSeq,7,10)
+<<<<<<< Updated upstream
+=======
+
+        #Drift frequency
+        self.driftFreqLabel = QLabel('Freq.',self)
+        self.driftFreqLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.driftFreq = QLineEdit(self)
+        self.driftFreq.setFixedWidth(40 * scale_w)
+        self.driftFreq.setAlignment(QtCore.Qt.AlignRight)
+        self.driftFreqSeq = QComboBox(self)
+        self.driftFreqSeq.addItem('None')
+        self.driftFreqSeq.setFixedWidth(20 * scale_w)
+        self.driftFreq.editingFinished.connect(lambda: self.variableProc('driftFreq',self.driftFreq.text()))
+        self.driftFreqSeq.activated.connect(lambda: self.menuProc('driftFreqSeq',self.driftFreqSeq.currentText()))
+
+        self.designPanelLayout.addWidget(self.driftFreqLabel,7,8)
+        self.designPanelLayout.addWidget(self.driftFreq,7,9)
+        self.designPanelLayout.addWidget(self.driftFreqSeq,7,10)
+>>>>>>> Stashed changes
 
         #Start Radius
         self.startRadLabel = QLabel('Start Rad.',self)
         self.startRadLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.startRad = QLineEdit(self)
-        self.startRad.setFixedWidth(40)
+        self.startRad.setFixedWidth(40 * scale_w)
         self.startRad.setAlignment(QtCore.Qt.AlignRight)
         self.startRadSeq = QComboBox(self)
         self.startRadSeq.addItem('None')
+<<<<<<< Updated upstream
         self.startRadSeq.setFixedWidth(20)
+=======
+        self.startRadSeq.setFixedWidth(20 * scale_w)
+>>>>>>> Stashed changes
         self.startRad.editingFinished.connect(lambda: self.variableProc('startRad',self.startRad.text()))
         self.startRadSeq.activated.connect(lambda: self.menuProc('startRadSeq',self.startRadSeq.currentText()))
 
@@ -1532,11 +4427,15 @@ class App(QMainWindow):
         self.angleLabel = QLabel('Angle',self)
         self.angleLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.angle = QLineEdit(self)
-        self.angle.setFixedWidth(40)
+        self.angle.setFixedWidth(40 * scale_w)
         self.angle.setAlignment(QtCore.Qt.AlignRight)
         self.angleSeq = QComboBox(self)
         self.angleSeq.addItem('None')
+<<<<<<< Updated upstream
         self.angleSeq.setFixedWidth(20)
+=======
+        self.angleSeq.setFixedWidth(20 * scale_w)
+>>>>>>> Stashed changes
         self.angle.editingFinished.connect(lambda: self.variableProc('angle',self.angle.text()))
         self.angleSeq.activated.connect(lambda: self.menuProc('angleSeq',self.angleSeq.currentText()))
 
@@ -1545,13 +4444,21 @@ class App(QMainWindow):
         self.designPanelLayout.addWidget(self.angleSeq,9,10)
 
         #blank after angle row so hiding modFrequency doesn't change grid
+<<<<<<< Updated upstream
         self.blank5.setFixedHeight(20)
+=======
+        self.blank5.setFixedHeight(20 * scale_h)
+>>>>>>> Stashed changes
         self.designPanelLayout.addWidget(self.blank5,10,8,1,1)
         #self.blank5.setStyleSheet("QLabel {background-color: green;}")
         self.blank5.setAlignment(QtCore.Qt.AlignVCenter)
 
         #insert blank after the spatial frequency row
+<<<<<<< Updated upstream
         self.blank4.setFixedHeight(20)
+=======
+        self.blank4.setFixedHeight(20 * scale_h)
+>>>>>>> Stashed changes
         self.designPanelLayout.addWidget(self.blank4,11,0,1,10)
         #self.blank4.setStyleSheet("QLabel {background-color: black;}")
         self.blank4.setAlignment(QtCore.Qt.AlignVCenter)
@@ -1561,12 +4468,16 @@ class App(QMainWindow):
         self.timingLabel.setFont(bold)
         self.delayLabel = QLabel('Delay',self)
         self.delay = QLineEdit(self)
-        self.delay.setFixedWidth(40)
+        self.delay.setFixedWidth(40 * scale_w)
         self.delay.setAlignment(QtCore.Qt.AlignRight)
         self.delayLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.delaySeq = QComboBox(self)
         self.delaySeq.addItem('None')
+<<<<<<< Updated upstream
         self.delaySeq.setFixedWidth(20)
+=======
+        self.delaySeq.setFixedWidth(20 * scale_w)
+>>>>>>> Stashed changes
         self.delay.editingFinished.connect(lambda: self.variableProc('delay',self.delay.text()))
         self.delaySeq.activated.connect(lambda: self.menuProc('delaySeq',self.delaySeq.currentText()))
 
@@ -1578,12 +4489,16 @@ class App(QMainWindow):
         #Duration
         self.durationLabel = QLabel('Duration',self)
         self.duration = QLineEdit(self)
-        self.duration.setFixedWidth(40)
+        self.duration.setFixedWidth(40 * scale_w)
         self.duration.setAlignment(QtCore.Qt.AlignRight)
         self.durationLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.durationSeq = QComboBox(self)
         self.durationSeq.addItem('None')
+<<<<<<< Updated upstream
         self.durationSeq.setFixedWidth(20)
+=======
+        self.durationSeq.setFixedWidth(20 * scale_w)
+>>>>>>> Stashed changes
         self.duration.editingFinished.connect(lambda: self.variableProc('duration',self.duration.text()))
         self.durationSeq.activated.connect(lambda: self.menuProc('durationSeq',self.durationSeq.currentText()))
 
@@ -1594,9 +4509,10 @@ class App(QMainWindow):
         #Trial Time
         self.trialTimeLabel = QLabel('Trial Time',self)
         self.trialTime = QLineEdit(self)
-        self.trialTime.setFixedWidth(40)
+        self.trialTime.setFixedWidth(40 * scale_w)
         self.trialTime.setAlignment(QtCore.Qt.AlignRight)
         self.trialTimeLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.trialTime.editingFinished.connect(lambda: self.variableProc('trialTime',self.trialTime.text()))
 
         self.designPanelLayout.addWidget(self.trialTimeLabel,15,0)
         self.designPanelLayout.addWidget(self.trialTime,15,1)
@@ -1607,7 +4523,7 @@ class App(QMainWindow):
         self.repeatsLabel = QLabel('Repeats',self)
         self.repeatsLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.repeats = QLineEdit(self)
-        self.repeats.setFixedWidth(40)
+        self.repeats.setFixedWidth(40 * scale_w)
         self.repeats.setAlignment(QtCore.Qt.AlignRight)
 
         self.loopCheckLabel = QLabel('Loop',self)
@@ -1627,7 +4543,11 @@ class App(QMainWindow):
         self.trajectory = QComboBox()
         self.trajectory.addItem('None')
         self.trajectory.activated.connect(lambda: self.menuProc('trajectory',self.trajectory.currentText()))
+<<<<<<< Updated upstream
 
+=======
+        self.trajectory.setFixedHeight(20 * scale_h)
+>>>>>>> Stashed changes
         self.designPanelLayout.addWidget(self.trajectoryLabel,12,8,1,2)
         self.designPanelLayout.addWidget(self.trajectory,13,8,1,2)
 
@@ -1636,12 +4556,17 @@ class App(QMainWindow):
         self.triggerLabel.setFont(bold)
         self.trigger = QComboBox()
         self.trigger.addItems(['None','Wait For Trigger','Send Trigger'])
+<<<<<<< Updated upstream
 
+=======
+        self.trigger.setFixedHeight(20 * scale_h)
+>>>>>>> Stashed changes
         self.designPanelLayout.addWidget(self.triggerLabel,14,8,1,2)
         self.designPanelLayout.addWidget(self.trigger,15,8,1,2)
 
     #Masks Panel
     def buildMasksPanel(self):
+<<<<<<< Updated upstream
         left = 165
         top = 300
         width = 475
@@ -1649,6 +4574,21 @@ class App(QMainWindow):
 
         bold = QtGui.QFont("Helvetica", 14,weight=QtGui.QFont.Normal)
         large = QtGui.QFont("Helvetica", 13)
+=======
+        left = 165 * scale_w
+        top = 300 * scale_h
+        width = 475 * scale_w
+        height = 190 * scale_h
+
+        if system == 'Windows':
+            #fonts
+            bold = QtGui.QFont("Roboto Light", 10,weight=QtGui.QFont.Bold)
+            large = QtGui.QFont("Roboto Light", 11)
+        elif system == 'Darwin':
+            #fonts
+            bold = QtGui.QFont("Helvetica", 14,weight=QtGui.QFont.Normal)
+            large = QtGui.QFont("Helvetica", 13)
+>>>>>>> Stashed changes
 
         #Group box and  maskPanelLayout layout
         self.maskPanel = QGroupBox(self)
@@ -1661,6 +4601,7 @@ class App(QMainWindow):
         self.maskPanel.resize(width,height)
 
         #Mask Types
+<<<<<<< Updated upstream
         self.maskTypeLabel = QLabel('Type')
         self.maskTypeLabel.setFont(bold)
 
@@ -1669,21 +4610,57 @@ class App(QMainWindow):
 
         maskPanelLayout.addWidget(self.maskTypeLabel,0,0)
         maskPanelLayout.addWidget(self.maskType,1,0)
+=======
+        self.apertureLabel = QLabel('Aperture')
+        self.apertureLabel.setFont(bold)
+        self.apertureLabel.setAlignment(QtCore.Qt.AlignVCenter)
+        self.apertureStatus = QComboBox()
+        self.apertureStatus.addItems(['On','Off'])
+        self.apertureStatus.setFixedHeight(20 * scale_h)
+        self.apertureStatus.activated.connect(lambda: self.menuProc('apertureStatus',self.apertureStatus.currentText()))
+
+        self.apertureDiamLabel = QLabel('Diameter')
+        self.apertureDiamLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.apertureDiam = QLineEdit()
+        self.apertureDiam.setAlignment(QtCore.Qt.AlignRight)
+        self.apertureDiam.setFixedWidth(40 * scale_w)
+        self.apertureDiam.editingFinished.connect(lambda: self.variableProc('apertureDiam',self.apertureDiam.text()))
+
+        self.apertureDiamSeq = QComboBox()
+        self.apertureDiamSeq.addItem('None')
+        self.apertureDiamSeq.setFixedWidth(20 * scale_w)
+        self.apertureDiamSeq.activated.connect(lambda: self.menuProc('apertureDiamSeq',self.apertureDiamSeq.currentText()))
+
+        maskPanelLayout.addWidget(self.apertureLabel,0,0)
+        maskPanelLayout.addWidget(self.apertureStatus,0,1,1,2)
+        maskPanelLayout.addWidget(self.apertureDiamLabel,1,0)
+        maskPanelLayout.addWidget(self.apertureDiam,1,1)
+        maskPanelLayout.addWidget(self.apertureDiamSeq,1,2)
+>>>>>>> Stashed changes
 
         #Mask Object Types
+        self.maskLabel = QLabel('Masks')
+        self.maskLabel.setFont(bold)
         self.maskObjectTypeLabel = QLabel('Object')
         self.maskObjectTypeLabel.setFont(bold)
 
         self.maskObjectType = QComboBox()
+<<<<<<< Updated upstream
         self.maskObjectType.addItems(['Circle','Rectangle'])
         self.maskObjectType.setFixedWidth(106)
         self.maskObjectType.activated.connect(lambda: self.menuProc('maskObjectType',self.maskObjectType.currentText()))
+=======
+        self.maskObjectType.addItems(['Circle','Gaussian','Blur'])
+        self.maskObjectType.activated.connect(lambda: self.menuProc('maskObjectType',self.maskObjectType.currentText()))
+        self.maskObjectType.setFixedHeight(20 * scale_h)
+>>>>>>> Stashed changes
 
-        maskPanelLayout.addWidget(self.maskObjectTypeLabel,2,0)
-        maskPanelLayout.addWidget(self.maskObjectType,3,0)
+        maskPanelLayout.addWidget(self.maskLabel,2,0,1,2)
+        maskPanelLayout.addWidget(self.maskObjectType,3,0,1,2)
 
         #Mask Object List Box
         self.maskObjectListBox = QListWidget(self)
+<<<<<<< Updated upstream
         self.maskObjectListBox.setFixedWidth(127)
         self.maskObjectListBox.addItems(objectList)
         self.maskObjectListBox.setFont(large)
@@ -1691,18 +4668,43 @@ class App(QMainWindow):
         self.maskObjectListBox.setSelectionMode(1)
 
         maskPanelLayout.addWidget(self.maskObjectListBox,0,2,4,1)
+=======
+        self.maskObjectListBox.setFixedWidth(127 * scale_w)
+        self.maskObjectListBox.addItems(maskList)
+        self.maskObjectListBox.setFont(large)
+        self.maskObjectListBox.setCurrentRow(0)
+        self.maskObjectListBox.setSelectionMode(1)
+        self.maskObjectListBox.itemClicked.connect(lambda: self.listProc('maskObjectListBox',self.maskObjectListBox.currentRow()))
+        maskPanelLayout.addWidget(self.maskObjectListBox,0,4,4,1)
+
+
+        # #Add blank slot to the right of the object type menu
+        # maskPanelLayout.addWidget(self.blank7,7,3)
+        # #self.blank2.setStyleSheet("QLabel {background-color: blue;}")
+        # self.blank7.setFixedHeight(20 * scale_h)
+        # #self.blank2.setFixedWidth(20 * scale_h)
+        # self.blank4.setAlignment(QtCore.Qt.AlignVCenter)
+>>>>>>> Stashed changes
 
         #Mask Coordinates
         self.maskCoordinateLabel = QLabel('Coordinates')
         self.maskCoordinateLabel.setFont(bold)
 
         self.maskCoordinateType = QComboBox()
+<<<<<<< Updated upstream
         self.maskCoordinateType.setFixedWidth(106)
         self.maskCoordinateType.addItems(['Cartesian','Polar'])
         self.maskCoordinateType.activated.connect(lambda: self.menuProc('maskCoordinateType',self.maskCoordinateType.currentText()))
 
         maskPanelLayout.addWidget(self.maskCoordinateLabel,0,4,1,2)
         maskPanelLayout.addWidget(self.maskCoordinateType,1,4,1,2)
+=======
+        self.maskCoordinateType.addItems(['Cartesian','Polar'])
+        self.maskCoordinateType.activated.connect(lambda: self.menuProc('maskCoordinateType',self.maskCoordinateType.currentText()))
+        self.maskCoordinateType.setFixedHeight(20 * scale_h)
+        maskPanelLayout.addWidget(self.maskCoordinateLabel,0,6,1,2)
+        maskPanelLayout.addWidget(self.maskCoordinateType,1,6,1,2)
+>>>>>>> Stashed changes
 
         #Mask X offset
         self.maskXPosLabel = QLabel('X Offset')
@@ -1710,17 +4712,25 @@ class App(QMainWindow):
 
         self.maskXPos = QLineEdit()
         self.maskXPos.setAlignment(QtCore.Qt.AlignRight)
+<<<<<<< Updated upstream
         self.maskXPos.setFixedWidth(40)
+=======
+        self.maskXPos.setFixedWidth(40 * scale_w)
+>>>>>>> Stashed changes
         self.maskXPos.editingFinished.connect(lambda: self.variableProc('maskXPos',self.maskXPos.text()))
 
         self.maskXPosSeq = QComboBox()
         self.maskXPosSeq.addItem('None')
+<<<<<<< Updated upstream
         self.maskXPosSeq.setFixedWidth(20)
+=======
+        self.maskXPosSeq.setFixedWidth(20 * scale_w)
+>>>>>>> Stashed changes
         self.maskXPosSeq.activated.connect(lambda: self.menuProc('maskXPosSeq',self.maskXPosSeq.currentText()))
 
-        maskPanelLayout.addWidget(self.maskXPosLabel,2,4)
-        maskPanelLayout.addWidget(self.maskXPos,2,5)
-        maskPanelLayout.addWidget(self.maskXPosSeq,2,6)
+        maskPanelLayout.addWidget(self.maskXPosLabel,2,6)
+        maskPanelLayout.addWidget(self.maskXPos,2,7)
+        maskPanelLayout.addWidget(self.maskXPosSeq,2,8)
 
         #Mask Y offset
         self.maskYPosLabel = QLabel('Y Offset')
@@ -1728,40 +4738,107 @@ class App(QMainWindow):
 
         self.maskYPos = QLineEdit()
         self.maskYPos.setAlignment(QtCore.Qt.AlignRight)
+<<<<<<< Updated upstream
         self.maskYPos.setFixedWidth(40)
+=======
+        self.maskYPos.setFixedWidth(40 * scale_w)
+>>>>>>> Stashed changes
         self.maskYPos.editingFinished.connect(lambda: self.variableProc('maskYPos',self.maskYPos.text()))
 
         self.maskYPosSeq = QComboBox()
         self.maskYPosSeq.addItem('None')
+<<<<<<< Updated upstream
         self.maskYPosSeq.setFixedWidth(20)
         self.maskYPosSeq.activated.connect(lambda: self.menuProc('maskYPosSeq',self.maskYPosSeq.currentText()))
 
         maskPanelLayout.addWidget(self.maskYPosLabel,3,4)
         maskPanelLayout.addWidget(self.maskYPos,3,5)
         maskPanelLayout.addWidget(self.maskYPosSeq,3,6)
+=======
+        self.maskYPosSeq.setFixedWidth(20 * scale_w)
+        self.maskYPosSeq.activated.connect(lambda: self.menuProc('maskYPosSeq',self.maskYPosSeq.currentText()))
+
+        maskPanelLayout.addWidget(self.maskYPosLabel,3,6)
+        maskPanelLayout.addWidget(self.maskYPos,3,7)
+        maskPanelLayout.addWidget(self.maskYPosSeq,3,8)
+
+        #Polar Coordinates - Radius
+        self.maskPolarRadiusLabel = QLabel('Radius')
+        self.maskPolarRadiusLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.maskPolarRadius = QLineEdit()
+        self.maskPolarRadius.setAlignment(QtCore.Qt.AlignRight)
+        self.maskPolarRadius.setFixedWidth(40 * scale_w)
+        self.maskPolarRadiusSeq = QComboBox()
+        self.maskPolarRadiusSeq.addItem('None')
+        self.maskPolarRadiusSeq.setFixedWidth(20 * scale_w)
+        self.maskPolarRadius.editingFinished.connect(lambda: self.variableProc('maskPolarRadius',self.maskPolarRadius.text()))
+        self.maskPolarRadiusSeq.activated.connect(lambda: self.menuProc('maskPolarRadiusSeq',self.maskPolarRadiusSeq.currentText()))
+
+        maskPanelLayout.addWidget(self.maskPolarRadiusLabel,2,6)
+        maskPanelLayout.addWidget(self.maskPolarRadius,2,7)
+        maskPanelLayout.addWidget(self.maskPolarRadiusSeq,2,8)
+
+        #Polar Coordinates - Angle
+        self.maskPolarAngleLabel = QLabel('Angle')
+        self.maskPolarAngleLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.maskPolarAngle = QLineEdit()
+        self.maskPolarAngle.setAlignment(QtCore.Qt.AlignRight)
+        self.maskPolarAngle.setFixedWidth(40 * scale_w)
+        self.maskPolarAngleSeq = QComboBox()
+        self.maskPolarAngleSeq.addItem('None')
+        self.maskPolarAngleSeq.setFixedWidth(20 * scale_w)
+        self.maskPolarAngle.editingFinished.connect(lambda: self.variableProc('maskPolarAngle',self.maskPolarAngle.text()))
+        self.maskPolarAngleSeq.activated.connect(lambda: self.menuProc('maskPolarAngleSeq',self.maskPolarAngleSeq.currentText()))
+
+        maskPanelLayout.addWidget(self.maskPolarAngleLabel,3,6)
+        maskPanelLayout.addWidget(self.maskPolarAngle,3,7)
+        maskPanelLayout.addWidget(self.maskPolarAngleSeq,3,8)
+
+        #Mask Diameter
+        self.maskDiameterLabel = QLabel('Diameter')
+        self.maskDiameterLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.maskDiameter = QLineEdit()
+        self.maskDiameter.setAlignment(QtCore.Qt.AlignRight)
+        self.maskDiameter.setFixedWidth(40 * scale_w)
+        self.maskDiameter.editingFinished.connect(lambda: self.variableProc('maskDiameter',self.maskDiameter.text()))
+
+        self.maskDiameterSeq = QComboBox()
+        self.maskDiameterSeq.addItem('None')
+        self.maskDiameterSeq.setFixedWidth(20 * scale_w)
+        self.maskDiameterSeq.activated.connect(lambda: self.menuProc('maskDiameterSeq',self.maskDiameterSeq.currentText()))
+
+        maskPanelLayout.addWidget(self.maskDiameterLabel,4,0)
+        maskPanelLayout.addWidget(self.maskDiameter,4,1)
+        maskPanelLayout.addWidget(self.maskDiameterSeq,4,2)
+
+        self.addMask = QPushButton('Add\nMask')
+        self.addMask.setFixedWidth(65 * scale_w)
+        maskPanelLayout.addWidget(self.addMask,5,0,2,1)
+        self.removeMask = QPushButton('Remove\nMask')
+        self.removeMask.setFixedWidth(65 * scale_w)
+        maskPanelLayout.addWidget(self.removeMask,5,1,2,2)
+        self.addMask.clicked.connect(lambda: self.buttonProc("addMask"))
+        self.removeMask.clicked.connect(lambda: self.buttonProc("removeMask"))
+>>>>>>> Stashed changes
 
         #Spacer
-        self.blank1 = QLabel('')
-        maskPanelLayout.addWidget(self.blank1,4,0)
+        maskPanelLayout.setColumnStretch(3,1)
 
-        self.blank2 = QLabel('')
-        maskPanelLayout.addWidget(self.blank2,5,0)
+        maskPanelLayout.setColumnStretch(5,1)
 
-        self.blank3 = QLabel('            ')
-        maskPanelLayout.addWidget(self.blank3,0,3)
-        #self.blank3.setStyleSheet("QLabel {background-color: black;}")
-
-        self.blank4 = QLabel('')
-        maskPanelLayout.addWidget(self.blank4,0,1)
-
-    #Sequences  Panel
+    #Sequences Panel
     def buildSequencePanel(self):
-        left = 165
-        top = 300
-        width = 475
-        height = 400
+        left = 165 * scale_w
+        top = 300 * scale_h
+        width = 475 * scale_w
+        height = 400 * scale_h
 
-        bold = QtGui.QFont("Helvetica", 14,weight=QtGui.QFont.Normal)
+        if system == 'Windows':
+            #fonts
+            bold = QtGui.QFont("Roboto Light", 10,weight=QtGui.QFont.Bold)
+        elif system == 'Darwin':
+            #fonts
+            bold = QtGui.QFont("Helvetica", 14,weight=QtGui.QFont.Normal)
 
         #Group box and sequencePanelLayout layout
         self.sequencePanel = QGroupBox(self)
@@ -1816,6 +4893,7 @@ class App(QMainWindow):
 
         #Trajectory list box
         self.trajListBox = QListWidget()
+        self.trajListBox.itemClicked.connect(lambda: self.listProc('trajListBox',self.trajListBox.currentRow()))
         seqPanelLayout.addWidget(self.trajListBox,7,2,4,2)
 
         #Angle list box label
@@ -1826,6 +4904,7 @@ class App(QMainWindow):
 
         #Angle list box
         self.angleListBox = QListWidget()
+        self.angleListBox.currentRowChanged.connect(lambda: self.listProc('angleListBox',self.angleListBox.currentRow()))
         seqPanelLayout.addWidget(self.angleListBox,12,0,4,2)
 
         #Duration list box label
@@ -1836,6 +4915,7 @@ class App(QMainWindow):
 
         #Duration list box
         self.durationListBox = QListWidget()
+        self.durationListBox.currentRowChanged.connect(lambda: self.listProc('durationListBox',self.durationListBox.currentRow()))
         seqPanelLayout.addWidget(self.durationListBox,12,2,4,2)
 
         #Spacer
@@ -1879,10 +4959,10 @@ class App(QMainWindow):
 
     #Path Panel
     def buildPathPanel(self):
-        left = 10
-        top = 135
-        width = 475
-        height = 125
+        left = 10 * scale_w
+        top = 135 * scale_h
+        width = 475 * scale_w
+        height = 125 * scale_h
 
         self.pathGroup = QGroupBox(self)
         pathLayout = QGridLayout()
@@ -1895,10 +4975,10 @@ class App(QMainWindow):
         self.stimPathLabel = QLabel('Path:',self)
         self.stimPathLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.stimPath = QLineEdit(self)
-        self.stimPath.setText('/Users/bmb/Documents/MATLAB/stimGen/stimuli/')
+        self.stimPath.setText(stimPath)
         self.stimPathBrowse = QPushButton('...',self)
         self.stimPathBrowse.clicked.connect(lambda: self.buttonProc("stimPathBrowse"))
-        self.stimPathBrowse.setFixedWidth(40)
+        self.stimPathBrowse.setFixedWidth(40 * scale_w)
         pathLayout.addWidget(self.stimPathLabel,0,0)
         pathLayout.addWidget(self.stimPath,0,1,1,2)
         pathLayout.addWidget(self.stimPathBrowse,0,3)
@@ -1908,9 +4988,10 @@ class App(QMainWindow):
         self.saveToPathLabel = QLabel('Save To:',self)
         self.saveToPathLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.saveToPath = QLineEdit(self)
+        self.saveToPath.setText(saveToPath)
         self.saveToPathBrowse = QPushButton('...',self)
         self.saveToPathBrowse.clicked.connect(lambda: self.buttonProc("saveToPathBrowse"))
-        self.saveToPathBrowse.setFixedWidth(40)
+        self.saveToPathBrowse.setFixedWidth(40 * scale_w)
         pathLayout.addWidget(self.saveToPathLabel,1,0)
         pathLayout.addWidget(self.saveToPath,1,1,1,2)
         pathLayout.addWidget(self.saveToPathBrowse,1,3)
@@ -1926,19 +5007,24 @@ class App(QMainWindow):
         self.stimIDLabel = QLabel('Stim ID:',self)
         self.stimIDLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.stimID = QLineEdit(self)
-        self.stimID.setFixedWidth(40)
+        self.stimID.setFixedWidth(40 * scale_w)
         self.stimID.setAlignment(QtCore.Qt.AlignCenter)
         pathLayout.addWidget(self.stimIDLabel,2,2)
         pathLayout.addWidget(self.stimID,2,3)
 
     #Globals Panel
     def buildGlobalsPanel(self):
-        left = 495
-        top = 10
-        width = 145
-        height = 250
+        left = 495 * scale_w
+        top = 10 * scale_h
+        width = 145 * scale_w
+        height = 250 * scale_h
 
-        bold = QtGui.QFont("Helvetica", 14,weight=QtGui.QFont.Normal)
+        if system == 'Windows':
+            #fonts
+            bold = QtGui.QFont("Roboto Light", 10,weight=QtGui.QFont.Bold)
+        elif system == 'Darwin':
+            #fonts
+            bold = QtGui.QFont("Helvetica", 14,weight=QtGui.QFont.Normal)
 
         self.globalsGroup = QGroupBox(self)
         self.globalsGroup.move(left,top)
@@ -1949,16 +5035,17 @@ class App(QMainWindow):
 
         #Globals label
         self.globalsLabel = QLabel('Globals')
-        self.globalsLayout.addWidget(self.globalsLabel,0,0)
+        self.globalsLayout.addWidget(self.globalsLabel,0,0,1,2)
         self.globalsLabel.setFont(bold)
 
         #Monitor
+
         self.monitor = QComboBox(self)
         self.monitor.setFixedWidth(45)
         self.monitorLabel= QLabel('Monitor')
 
         #Find number of monitors
-        self.monitor.addItem('1')
+        self.monitor.addItems(['1','2'])
         self.globalsLayout.addWidget(self.monitorLabel,1,0,1,2)
         self.monitorLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.globalsLayout.addWidget(self.monitor,1,2)
@@ -2018,6 +5105,7 @@ class App(QMainWindow):
         self.syncSpotLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.syncSpot = QCheckBox(self)
         self.syncSpot.setChecked(True)
+        self.syncSpot.stateChanged.connect(lambda: self.checkProc('syncSpot',self.syncSpot.isChecked()))
         self.globalsLayout.addWidget(self.syncSpotLabel,7,0,1,2)
         self.globalsLayout.addWidget(self.syncSpot,7,2)
 
@@ -2026,6 +5114,7 @@ class App(QMainWindow):
         self.gammaTable = QComboBox()
         self.gammaTable.addItems(['1.0','2.2'])
         self.gammaTable.setFixedWidth(45)
+        self.gammaTable.activated.connect(lambda: self.menuProc('gammaTable',self.gammaTable.currentText()))
 
         self.globalsLayout.addWidget(self.gammaTableLabel,8,0,1,2)
         self.gammaTableLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
@@ -2033,6 +5122,7 @@ class App(QMainWindow):
 
     #Stimulus Bank
     def buildStimusBank(self):
+<<<<<<< Updated upstream
         left = 10
         top = 318
         width = 145
@@ -2040,16 +5130,32 @@ class App(QMainWindow):
 
         bold = QtGui.QFont("Helvetica", 14,weight=QtGui.QFont.Normal)
         large = QtGui.QFont("Helvetica", 13)
+=======
+        left = 10 * scale_w
+        top = 318 * scale_h
+        width = 145 * scale_w
+        height = 350 * scale_h
+
+        if system == 'Windows':
+            #fonts
+            bold = QtGui.QFont("Roboto Light", 10,weight=QtGui.QFont.Bold)
+            large = QtGui.QFont("Roboto Light", 11,weight=QtGui.QFont.Light)
+        elif system == 'Darwin':
+            #fonts
+            bold = QtGui.QFont("Helvetica", 14,weight=QtGui.QFont.Normal)
+            large = QtGui.QFont("Helvetica", 13)
+>>>>>>> Stashed changes
 
         #Stimulus Bank Label
         self.stimBankLabel  = QLabel('Stimulus Bank',self)
-        self.stimBankLabel.move(left+30,top-55)
+        self.stimBankLabel.move(left+30 * scale_w,top-55 * scale_h)
 
         #Stimulus subfolder
         self.subFolder = QComboBox(self)
-        self.subFolder.move(left,top-30)
-        self.subFolder.resize(width,25)
+        self.subFolder.move(left,top-30 * scale_h)
+        self.subFolder.resize(width,25 * scale_h)
         self.subFolder.addItem('Ben')
+        self.subFolder.setFont(large)
 
         #Stimulus Bank
         self.stimBank = QListWidget(self)
@@ -2060,14 +5166,24 @@ class App(QMainWindow):
 
         #save stimulus
         self.saveStim = QPushButton('Save',self)
+<<<<<<< Updated upstream
         self.saveStim.move(left+5,top + 360)
         self.saveStim.resize(60,20)
+=======
+        self.saveStim.move(left+5 * scale_w,top + 360 * scale_h)
+        self.saveStim.resize(60 * scale_w,20 * scale_h)
+>>>>>>> Stashed changes
         self.saveStim.clicked.connect(lambda: self.buttonProc("saveStim"))
 
         #delete stimulus
         self.deleteStim = QPushButton('Delete',self)
+<<<<<<< Updated upstream
         self.deleteStim.move(left+80,top + 360)
         self.deleteStim.resize(60,20)
+=======
+        self.deleteStim.move(left+80 * scale_w,top + 360 * scale_h)
+        self.deleteStim.resize(60 * scale_w,20 * scale_h)
+>>>>>>> Stashed changes
         self.deleteStim.clicked.connect(lambda: self.buttonProc("deleteStim"))
 
     #save the stimulus to a text file
@@ -2085,27 +5201,57 @@ class App(QMainWindow):
         stimulus = json.dumps(stim)
         sequence = json.dumps(seqAssignTemp)
         seqDefs = json.dumps(seqDict)
+<<<<<<< Updated upstream
 
         #show input dialog for naming the sequence
         name, ok = QInputDialog.getText(self, 'Save Stimulus',
             'Stimulus Name:')
+=======
+        trajDefs = json.dumps(trajDict)
+        maskDefs = json.dumps(maskDict)
+
+        #show input dialog for naming the sequence
+        #stimulus = self.stimBank.currentItem()
+        #stimName = stimulus.text() #current selection is default name
+
+        name, ok = QInputDialog.getText(self, 'Save Stimulus','Stimulus Name:')#,QLineEdit.Normal,stimName)
+        if name == '':
+            return
+>>>>>>> Stashed changes
 
         fileName = name + '.stim'
 
         subfolder = self.subFolder.currentText()
 
+<<<<<<< Updated upstream
         path = '/Users/bmb/Documents/GitHub/StimGen/stimuli/' + subfolder + '/' + fileName
+=======
+        path = stimPath + subfolder + '/' + fileName
+>>>>>>> Stashed changes
 
         print('Saved Stimulus: ' + path)
 
         #open and write dictionaries to the file
         with open(path,'w+') as file:
+<<<<<<< Updated upstream
             file.write('Stimulus:')
             file.write(stimulus)
             file.write('Sequences:')
             file.write(seqDefs)
             file.write('Assignments:')
             file.write(sequence)
+=======
+            file.write('Stimulus|')
+            file.write(stimulus)
+            file.write('|Sequences|')
+            file.write(seqDefs)
+            file.write('|Assignments|')
+            file.write(sequence)
+            file.write("|Trajectories|")
+            file.write(trajDefs)
+            file.write("|Masks|")
+            file.write(maskDefs)
+>>>>>>> Stashed changes
 
         file.close()
 
@@ -2122,7 +5268,11 @@ class App(QMainWindow):
         #put the file in the stimulus subfolder
         fileName = 'cloudFile.hdf5'
         subfolder = self.subFolder.currentText()
+<<<<<<< Updated upstream
         path = '/Users/bmb/Documents/GitHub/StimGen/stimuli/' + subfolder + '/' + fileName
+=======
+        path = stimPath + subfolder + '/' + fileName
+>>>>>>> Stashed changes
 
         file = h5py.File(path,'w')
         file.create_dataset('MC',data=cloud,compression='gzip',compression_opts=9)
@@ -2143,7 +5293,11 @@ class App(QMainWindow):
 
         fileName = stimName + '.stim'
         subfolder = self.subFolder.currentText()
+<<<<<<< Updated upstream
         path = '/Users/bmb/Documents/GitHub/StimGen/stimuli/' + subfolder + '/' + fileName
+=======
+        path = stimPath + subfolder + '/' + fileName
+>>>>>>> Stashed changes
 
         #delete the file, remove it from the stimulus bank
         os.remove(path)
@@ -2161,7 +5315,11 @@ class App(QMainWindow):
     def loadStimulus(self):
 
         global seqAssign,seqDict,stim
+<<<<<<< Updated upstream
         global objectList,seqList
+=======
+        global objectList,seqList,trajList,trajDict,maskDict
+>>>>>>> Stashed changes
 
         #which stimulus is selected
         stimulus = self.stimBank.currentItem()
@@ -2170,11 +5328,16 @@ class App(QMainWindow):
         stimName = stimulus.text()
         fileName = stimName + '.stim'
         subfolder = self.subFolder.currentText()
+<<<<<<< Updated upstream
         path = '/Users/bmb/Documents/GitHub/StimGen/stimuli/' + subfolder + '/' + fileName
+=======
+        path = stimPath + subfolder + '/' + fileName
+>>>>>>> Stashed changes
 
         #open and read stimulus file to dictionaries
         with open(path,'r') as file:
             fileStr = file.read()
+<<<<<<< Updated upstream
             #gets first section of data before 'Sequences:'
             stimStr,theRest = fileStr.split('Sequences:',1)
             seqStr,theRest = theRest.split('Assignments',1)
@@ -2183,10 +5346,25 @@ class App(QMainWindow):
             #some character removals to make it pure json compatible string
             assignmentStr = assignmentStr[1:]
             stimStr = stimStr.replace('Stimulus:','')
+=======
+
+            #split up the file into its components
+            dictList = fileStr.split('|')
+            stimStr = dictList[1]
+            seqStr = dictList[3]
+            assignmentStr = dictList[5]
+            trajStr = dictList[7]
+            # maskStr = dictList[9]
+>>>>>>> Stashed changes
 
             stim = json.loads(stimStr)
             seqDict = json.loads(seqStr)
             seqAssign = json.loads(assignmentStr)
+<<<<<<< Updated upstream
+=======
+            trajDict = json.loads(trajStr)
+            # maskDict = json.loads(maskStr)
+>>>>>>> Stashed changes
 
             #convert the string keys to integers
             stim = {int(k):v for k,v in stim.items()}
@@ -2217,11 +5395,39 @@ class App(QMainWindow):
                 control[key].clear() #first reset sequence menus
                 control[key].addItems(seqList)
 
+<<<<<<< Updated upstream
+=======
+            trajList = ['None']
+            self.trajListBox.clear()
+
+            for traj in trajDict:
+                trajList.append(traj)
+                self.trajListBox.addItem(traj)
+
+            if len(trajList) > 1:
+                self.trajListBox.setCurrentRow(0)
+                item = self.trajListBox.currentItem()
+                name = item.text()
+                self.updateTrajectory(name)
+            else:
+                self.angleListBox.clear()
+                self.durationListBox.clear()
+                self.trajAngle.setText('')
+                self.trajDuration.setText('')
+
+            self.trajectory.clear()
+            self.trajectory.addItems(trajList)
+
+>>>>>>> Stashed changes
             #clear object list and repopulate with loaded objects
             objectList = []
             numObjects = len(stim)
             for i in range(numObjects):
+<<<<<<< Updated upstream
                 objectList.append(stim[i]['objectType'])
+=======
+                objectList.append((stim[i]['objectType']))
+>>>>>>> Stashed changes
 
             #populate the controls for the first object
             self.objectListBox.clear()
@@ -2230,8 +5436,13 @@ class App(QMainWindow):
             self.setObjectParameters(0)
 
             self.maskObjectListBox.clear()
+<<<<<<< Updated upstream
             self.maskObjectListBox.addItems(objectList)
             self.maskObjectListBox.setCurrentRow(0)
+=======
+            #self.maskObjectListBox.addItems(objectList)
+            #self.maskObjectListBox.setCurrentRow(0)
+>>>>>>> Stashed changes
 
             #display sequence assignment message
             self.displaySeqAssignments(0)
@@ -2239,7 +5450,11 @@ class App(QMainWindow):
     #find all the stimulus files in the selected subfolder
     def getStimulusBank(self):
         subfolder = self.subFolder.currentText()
+<<<<<<< Updated upstream
         path = '/Users/bmb/Documents/GitHub/StimGen/stimuli/' + subfolder
+=======
+        path = stimPath + subfolder
+>>>>>>> Stashed changes
 
         fileList = os.listdir(path)
         stimList = []
@@ -2261,25 +5476,79 @@ class App(QMainWindow):
         #alphabetical order
         self.stimBank.sortItems(QtCore.Qt.AscendingOrder)
 
+<<<<<<< Updated upstream
+=======
+    #finds all the images in the selected stimulus subfolder with .bmp extensions
+    def getImageBank(self):
+        subfolder = self.subFolder.currentText()
+        path = stimPath + subfolder
+
+        fileList = os.listdir(path)
+        imageList = []
+
+        i = 0
+        for _ in fileList:
+            fileList[i],ext = os.path.splitext(fileList[i])
+
+            #only accept .stim files (these are just text files with .stim extension)
+            if ext == '.bmp':
+                imageList.append(fileList[i])
+
+            i += 1
+
+        #add the images to the drop down menu
+        self.imagePath.addItems(imageList)
+
+>>>>>>> Stashed changes
     #is the string a decimal number?
     def isFloat(self,s):
         if '.' in s:
             return True
         else:
             return False
+<<<<<<< Updated upstream
+=======
+
+    #creates a numpy array of a circle at the specified center point and radius
+    def create_circular_mask(self,h, w, type, center=None, radius=None):
+        #mask array is either -1 or 1. -1 is part of the masked area, 1 is part of the windowed area
+
+        if center is None: # use the middle of the image
+            center = [int(w/2), int(h/2)]
+        if radius is None: # use the smallest distance between the center and image walls
+            radius = min(center[0], center[1], w-center[0], h-center[1])
+
+        Y, X = np.ogrid[:h, :w]
+        dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
+        mask = dist_from_center <= radius
+
+        maskOut = np.ones((w,h))
+        #window or mask?
+        if type == 'Window':
+            maskOut[~mask] = -1
+        elif type == 'Mask':
+            maskOut[mask] = -1
+
+        return maskOut
+>>>>>>> Stashed changes
 
     #Default settings
     def setDefaults(self):
-        self.ppm.setText('1')
-        self.background.setText('127')
+        self.monitor.setCurrentIndex(0)
+        self.ppm.setText('0.717')
+        self.background.setText('0')
         self.xOffset.setText('0')
         self.yOffset.setText('0')
         self.syncFrames.setText('0')
         self.xPos.setText('0')
         self.yPos.setText('0')
+        self.polarRadius.setText('0')
+        self.polarAngle.setText('0')
         self.maskXPos.setText('0')
         self.maskYPos.setText('0')
         self.diameter.setText('0')
+        self.innerDiameter.setText('0')
+        self.outerDiameter.setText('0')
         self.length.setText('0')
         self.width.setText('0')
         self.spatialFreq.setText('0')
@@ -2289,15 +5558,42 @@ class App(QMainWindow):
         self.modulationFreq.setText('0')
         self.repeats.setText('1')
         self.speed.setText('0')
+        self.driftFreq.setText('0')
         self.startRad.setText('0')
         self.angle.setText('0')
         self.delay.setText('0')
         self.duration.setText('1')
         self.trialTime.setText('0')
+<<<<<<< Updated upstream
+=======
+        self.apertureDiam.setText('0')
+        self.maskDiameter.setText('0')
+        self.maskPolarRadius.setText('0')
+        self.maskPolarAngle.setText('0')
+        self.noiseSize.setText('50')
+        self.noiseSeed.setText('0')
+        self.noiseFreq.setText('0')
+        self.cloudSF.setText('0.125')
+        self.cloudSFBand.setText('0.1')
+        self.cloudSpeedX.setText('1.0')
+        self.cloudSpeedY.setText('0')
+        self.cloudSpeedBand.setText('0.5')
+        self.cloudOrient.setText('0')
+        self.cloudOrientBand.setText('20')
+        self.angularCycles.setText('0')
+        self.apertureStatus.setCurrentText('Off')
+        self.stimID.setText('0')
+        self.saveToPath.setText(saveToPath)
+>>>>>>> Stashed changes
 
 #Start the application
 if __name__ == '__main__':
 
+<<<<<<< Updated upstream
+=======
+
+
+>>>>>>> Stashed changes
     #create instance of application
     StimGen = QApplication([])
 
@@ -2306,8 +5602,21 @@ if __name__ == '__main__':
 
     #styles
     StimGen.setStyle('Fusion')
-    myFont = QtGui.QFont('Helvetica', 12,weight=QtGui.QFont.Light)
+
+    system = platform.system()
+    if system == 'Windows':
+        #fonts
+        myFont = QtGui.QFont('Roboto Light', 10,weight=QtGui.QFont.Light)
+
+    elif system == 'Darwin':
+        #fonts
+        myFont = QtGui.QFont('Helvetica', 12,weight=QtGui.QFont.Light)
+
     StimGen.setFont(myFont)
+
+    #self.window().devicePixelRatioF()
+
+
    # StimGen.setStyleSheet("QPushButton {border-radius: 20px;}")
     #StimGen.setStyleSheet("QPushButton {background-color: blue;}")
     ex = App()
