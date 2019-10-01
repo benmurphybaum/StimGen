@@ -4,7 +4,7 @@
 #pygame, pyglet, and psychopy
 
 #import widgets
-from PyQt5.QtWidgets import QApplication,QWidget,QMainWindow,QPushButton,QLineEdit,QGroupBox,QComboBox,QFrame,QAbstractItemView
+from PyQt5.QtWidgets import QApplication,QWidget,QMainWindow,QPushButton,QLineEdit,QGroupBox,QComboBox,QFrame,QAbstractItemView,QDesktopWidget
 from PyQt5.QtWidgets import QLabel,QListWidget,QListWidgetItem,QSpacerItem,QVBoxLayout,QGridLayout,QCheckBox,QInputDialog,QListView,QFontDialog
 from PyQt5 import QtCore,QtGui
 
@@ -14,7 +14,7 @@ from PyQt5 import QtCore,QtGui
 from time import sleep
 
 #for monitor specifications
-from win32api import GetSystemMetrics
+# from win32api import GetSystemMetrics
 
 #for plotting data
 #import matplotlib.pyplot as plt
@@ -56,13 +56,18 @@ class App(QMainWindow):
         super(App,self).__init__()
 
         #monitor scale factor
-        w = GetSystemMetrics(0)
-        h = GetSystemMetrics(1)
+        # w = GetSystemMetrics(0)
+        # h = GetSystemMetrics(1)
 
+        # w = 2048
+        # h = 1536
+        self.screen = QDesktopWidget().availableGeometry(1)
+        w = self.screen.width()
+        h = self.screen.height()
 
+        #coded on 2880x1800 retina display
         scale_h = 1
         scale_w = 1
-        #coded on 2880x1800 retina display
 
         #GUI dimensions
         self.title = "StimGen 5.0"
@@ -72,16 +77,17 @@ class App(QMainWindow):
         self.height = 780 * scale_h
 
         #path to the StimGen.py file
-        basePath = 'C:/Users/jadob/Desktop/StimGenPy_WIN/StimGen/'
+        # basePath = 'C:/Users/jadob/Desktop/StimGenPy_WIN/StimGen/'
+        basePath = '/Users/bmb/Documents/GitHub/StimGenPy_WIN/StimGen/'
         stimPath = basePath + 'stimuli/'
         imagePath = basePath + 'images/'
-        saveToPath = 'C:/Users/jadob/Desktop/stimulusLog/'
+        saveToPath = '/Users/bmb/Documents/GitHub/StimGenPy_WIN/stimulusLog/'
 
         #operating system
         system = platform.system()
 
         #set default fonts/sizes depending on operating system
-        if system == 'Windows':
+        if system == 'Windows' or system == 'Linux':
             #fonts
             bold = QtGui.QFont("Roboto", 10,weight=QtGui.QFont.Normal)
             boldLarge = QtGui.QFont("Roboto", 12,weight=QtGui.QFont.Normal)
@@ -223,6 +229,7 @@ class App(QMainWindow):
         #globals
         global isOpen
         isOpen = 0 #stimulus window is closed
+
 
     #Handles all variable entries
     def variableProc(self,controlName,entry):
@@ -417,6 +424,16 @@ class App(QMainWindow):
             saveToPath = tkinter.filedialog.askdirectory(initialdir = startPath)
             self.saveToPath.setText(saveToPath)
 
+        elif controlName == 'batchStimAdd':
+            stim = self.batchStimMenu.currentText()
+            self.batchStimList.addItem(stim)
+
+        elif controlName == 'batchStimRemove':
+            #selected item and its index
+            item = self.batchStimList.currentItem()
+
+            #delete trajectory from the list box
+            self.batchStimList.takeItem(self.batchStimList.row(item))
         else:
             #default
             print('other')
@@ -468,7 +485,7 @@ class App(QMainWindow):
 
     #Handles all drop down menu selections
     def menuProc(self,controlName,selection):
-        global objectList, stim, seqAssign, win, main
+        global objectList, stim, seqAssign, win, main,subfolder
 
         #Set contextual menus
         self.flipControls(controlName,selection)
@@ -530,12 +547,18 @@ class App(QMainWindow):
                 mon.setGamma(float(self.gammaTable.currentText()))
                 win.flip()
 
+        elif controlName == 'subFolder':
+            subfolder = selection
+            #get the stimulus files
+            self.getStimulusBank()
+
         else:
             #add parameter to stim dictionary for all other drop down menus (motionType,coordinateType, etc...)
             stim[index][controlName] = selection
 
     #Handles all of the list box selections
     def listProc(self,controlName,index):
+        global subfolder
 
         if controlName == 'objectListBox':
             self.setObjectParameters(index)
@@ -1077,6 +1100,17 @@ class App(QMainWindow):
                     control[key].show()
             self.flipControls('motionType',self.motionType.currentText())
 
+        elif selection == 'Batch':
+            self.batchStimMenu.clear()
+            stimList = self.getStimulusBank()
+            self.batchStimMenu.addItems(stimList)
+
+            for key,value in batchSettings.iteritems():
+                if value == 0:
+                    control[key].hide()
+                else:
+                    control[key].show()
+
         elif selection == 'Snake':
             #some object dependent repositioning
             self.designPanelLayout.addWidget(self.angleLabel,9,8)
@@ -1547,10 +1581,15 @@ class App(QMainWindow):
                                         runTime[i]['stimulus'].setOri(stim[i]['orientation'] - runTime[i]['driftIncrement'] * runTime[i]['stimFrame'])
                                 else:
                                     if stim[i]['trajectory'] == 'None':
-                                        x = runTime[i]['startX'] + ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.cos(stim[i]['angle'] * np.pi/180)
-                                        y = runTime[i]['startY'] + ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.sin(stim[i]['angle'] * np.pi/180)
-                                        runTime[i]['stimulus'].pos = (x,y)
-
+                                        # x = runTime[i]['startX'] + ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.cos(stim[i]['angle'] * np.pi/180)
+                                        # y = runTime[i]['startY'] + ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.sin(stim[i]['angle'] * np.pi/180)
+                                        # runTime[i]['stimulus'].pos = (x,y)
+                                        stimulus = visual.ImageStim(
+                                            win=win,
+                                            units = 'pix',
+                                            image = stimArray[:,:,runTime[i]['stimFrame']],
+                                            size = (1024,768),
+                                            )
                                     else:
                                         runTime[i]['stimulus'].pos = self.getTrajectoryPosition(i)
 
@@ -1613,7 +1652,7 @@ class App(QMainWindow):
 
     #Defines the stimulus textures
     def defineStimulus(self,runTime,ppm,xOffset,yOffset,i,ifi):
-        global motionCloud, mask, ortho#, innerRing, outerRing
+        global motionCloud, mask, ortho,stimArray#, innerRing, outerRing
 
         firstIntensity = runTime[i]['firstIntensity']
         secondIntensity = runTime[i]['secondIntensity']
@@ -1624,32 +1663,38 @@ class App(QMainWindow):
 
         #polar coordinates or cartesian coordinates?
         if stim[i]['coordinateType'] == 'Cartesian':
-            xPos = stim[i]['xpos']
-            yPos = stim[i]['ypos']
+            xPos = stim[i]['xPos']
+            yPos = stim[i]['yPos']
         elif stim[i]['coordinateType'] == 'Polar':
             xPos = stim[i]['polarRadius'] * np.cos(stim[i]['polarAngle'] * pi/180)
             yPos = stim[i]['polarRadius'] * np.sin(stim[i]['polarAngle'] * pi/180)
 
-        if stim[i]['maskCoordinateType'] == 'Cartesian':
-            xPosMask = stim[i]['maskXPos']
-            yPosMask = stim[i]['maskYPos']
-        elif stim[i]['maskCoordinateType'] == 'Polar':
-            xPosMask = stim[i]['maskPolarRadius'] * np.cos(stim[i]['maskPolarAngle'] * pi/180)
-            yPosMask = stim[i]['maskPolarRadius'] * np.sin(stim[i]['maskPolarAngle'] * pi/180)
+        # if stim[i]['maskCoordinateType'] == 'Cartesian':
+        #     xPosMask = stim[i]['maskXPos']
+        #     yPosMask = stim[i]['maskYPos']
+        # elif stim[i]['maskCoordinateType'] == 'Polar':
+        #     xPosMask = stim[i]['maskPolarRadius'] * np.cos(stim[i]['maskPolarAngle'] * pi/180)
+        #     yPosMask = stim[i]['maskPolarRadius'] * np.sin(stim[i]['maskPolarAngle'] * pi/180)
 
 
         if stim[i]['objectType'] == 'Circle':
 
-            stimulus = visual.Circle(
-            win = win,
-            units = 'pix',
-            radius = stim[i]['diameter']*ppm/2,
-            fillColor = [1,1,1],
-            lineColor = [1,1,1],
-            contrast = firstIntensity,
-            edges = 100,
-            pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
-            )
+            #test draw frames to back buffer and save to an array
+            stimArray = self.getStimulusArray(ppm,i,xOffset,yOffset,xPos,yPos,firstIntensity)
+            return
+            #
+            # stimulus = visual.Circle(
+            # win = win,
+            # units = 'pix',
+            # radius = stim[i]['diameter']*ppm/2,
+            # fillColor = [1,1,1],
+            # lineColor = [1,1,1],
+            # contrast = firstIntensity,
+            # edges = 100,
+            # pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
+            # )
+
+
         elif stim[i]['objectType'] == 'Rectangle':
             #resolve masks
             #mask = self.getMask(w,h,i,ppm)
@@ -1907,6 +1952,43 @@ class App(QMainWindow):
                 )
 
         return stimulus
+
+    def getStimulusArray(self,ppm,i,xOffset,yOffset,xPos,yPos,firstIntensity):
+        #original stimulus definition
+        stimulus = visual.Circle(
+        win = win,
+        units = 'pix',
+        radius = stim[i]['diameter']*ppm/2,
+        fillColor = [1,1,1],
+        lineColor = [1,1,1],
+        contrast = firstIntensity,
+        edges = 100,
+        pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
+        )
+
+        frames = int(round(stim[i]['duration']/ifi))
+
+        stimulus.draw()
+        theStimFrame = visual.BufferImageStim(win,buffer='back',stim=[stimulus])
+        w = int(theStimFrame.size[0])
+        h = int(theStimFrame.size[1])
+
+
+        stimArray = np.zeros((w,h))
+
+        for frame in range(frames):
+            #draw the frame to the back buffer
+            stimulus.draw()
+            #save to the next frame in the array
+            theStimFrame = visual.BufferImageStim(win,buffer='back',stim=[stimulus])
+            theStimFrameArray = np.array(theStimFrame.image)
+            stimArray = np.vstack((stimArray,theStimFrameArray))
+
+            x = runTime[i]['startX'] + ppm * stim[i]['speed'] * (frame * ifi) * np.cos(stim[i]['angle'] * np.pi/180)
+            y = runTime[i]['startY'] + ppm * stim[i]['speed'] * (frame * ifi) * np.sin(stim[i]['angle'] * np.pi/180)
+            stimulus.pos = (x,y)
+
+        return stimArray
 
     #calculates the frames for each segent of the trajectory
     def calculateTrajectory(self,name,i,sweep,ifi,ppm,xOffset,yOffset):
@@ -2201,6 +2283,7 @@ class App(QMainWindow):
         'cloudOrient':0,
         'cloudOrientBand':0,
         'imagePath':'',
+        'batchStimList':'',
         'trajectory':'None',
         'delay':float(self.delay.text()),
         'duration':float(self.duration.text()),
@@ -2494,12 +2577,16 @@ class App(QMainWindow):
         'noiseSeedSeq':self.noiseSeedSeq,
         'noiseFreqLabel':self.noiseFreqLabel,
         'noiseFreq':self.noiseFreq,
-        'noiseFreqSeq':self.noiseFreqSeq
+        'noiseFreqSeq':self.noiseFreqSeq,
+        'batchStimMenu':self.batchStimMenu,
+        'batchStimList':self.batchStimList,
+        'batchStimAdd':self.batchStimAdd,
+        'batchStimRemove':self.batchStimRemove
         }
 
     #Set contextual menu dictionaries
     def setContextualMenus(self):
-        global circleSettings,rectangleSettings,gratingSettings,noiseSettings,cloudSettings,windmillSettings,annulusSettings,imageSettings,snakeSettings
+        global circleSettings,rectangleSettings,gratingSettings,noiseSettings,cloudSettings,windmillSettings,annulusSettings,imageSettings,batchSettings,snakeSettings
         global staticMotionSettings,dynamicModSettings,staticModSettings,windmillMotionSettings,driftGratingMotionSettings,driftMotionSettings
         global cartesianSettings,cartesianMaskSettings,polarSettings,polarMaskSettings
 
@@ -2554,6 +2641,10 @@ class App(QMainWindow):
         'cloudOrientLabel':0,
         'cloudOrient':0,
         'cloudOrientBand':0,
+        'batchStimMenu':0,
+        'batchStimList':0,
+        'batchStimAdd':0,
+        'batchStimRemove':0
         }
 
         annulusSettings = {
@@ -2607,6 +2698,10 @@ class App(QMainWindow):
         'cloudOrientLabel':0,
         'cloudOrient':0,
         'cloudOrientBand':0,
+        'batchStimMenu':0,
+        'batchStimList':0,
+        'batchStimAdd':0,
+        'batchStimRemove':0
         }
 
         rectangleSettings = {
@@ -2659,7 +2754,11 @@ class App(QMainWindow):
         'cloudSpeedBand':0,
         'cloudOrientLabel':0,
         'cloudOrient':0,
-        'cloudOrientBand':0
+        'cloudOrientBand':0,
+        'batchStimMenu':0,
+        'batchStimList':0,
+        'batchStimAdd':0,
+        'batchStimRemove':0
         }
 
         snakeSettings = {
@@ -2712,7 +2811,11 @@ class App(QMainWindow):
         'cloudSpeedBand':0,
         'cloudOrientLabel':0,
         'cloudOrient':0,
-        'cloudOrientBand':0
+        'cloudOrientBand':0,
+        'batchStimMenu':0,
+        'batchStimList':0,
+        'batchStimAdd':0,
+        'batchStimRemove':0
         }
 
         gratingSettings = {
@@ -2766,6 +2869,10 @@ class App(QMainWindow):
         'cloudOrientLabel':0,
         'cloudOrient':0,
         'cloudOrientBand':0,
+        'batchStimMenu':0,
+        'batchStimList':0,
+        'batchStimAdd':0,
+        'batchStimRemove':0
         }
 
         noiseSettings = {
@@ -2819,6 +2926,10 @@ class App(QMainWindow):
         'cloudOrientLabel':0,
         'cloudOrient':0,
         'cloudOrientBand':0,
+        'batchStimMenu':0,
+        'batchStimList':0,
+        'batchStimAdd':0,
+        'batchStimRemove':0
         }
 
         cloudSettings = {
@@ -2872,6 +2983,10 @@ class App(QMainWindow):
         'cloudOrientLabel':1,
         'cloudOrient':1,
         'cloudOrientBand':1,
+        'batchStimMenu':0,
+        'batchStimList':0,
+        'batchStimAdd':0,
+        'batchStimRemove':0
         }
 
         windmillSettings = {
@@ -2925,6 +3040,10 @@ class App(QMainWindow):
         'cloudOrientLabel':0,
         'cloudOrient':0,
         'cloudOrientBand':0,
+        'batchStimMenu':0,
+        'batchStimList':0,
+        'batchStimAdd':0,
+        'batchStimRemove':0
         }
 
         imageSettings = {
@@ -2978,6 +3097,67 @@ class App(QMainWindow):
         'cloudOrientLabel':0,
         'cloudOrient':0,
         'cloudOrientBand':0,
+        'batchStimMenu':0,
+        'batchStimList':0,
+        'batchStimAdd':0,
+        'batchStimRemove':0
+        }
+
+        batchSettings = {
+        'gratingType':0,
+        'diameter':0,
+        'diameterLabel':0,
+        'diameterSeq':0,
+        'imagePath':0,
+        'innerDiameter':0,
+        'innerDiameterLabel':0,
+        'innerDiameterSeq':0,
+        'outerDiameter':0,
+        'outerDiameterLabel':0,
+        'outerDiameterSeq':0,
+        'length':0,
+        'lengthLabel':0,
+        'lengthSeq':0,
+        'width':0,
+        'widthLabel':0,
+        'widthSeq':0,
+        'orientation':0,
+        'orientationLabel':0,
+        'orientationSeq':0,
+        'angularCyclesLabel':0,
+        'angularCycles':0,
+        'angularCyclesSeq':0,
+        'spatialPhase':0,
+        'spatialPhaseLabel':0,
+        'spatialPhaseSeq':0,
+        'spatialFreq':0,
+        'spatialFreqLabel':0,
+        'spatialFreqSeq':0,
+        'noiseType':0,
+        'noiseSeedLabel':0,
+        'noiseSeed':0,
+        'noiseSeedSeq':0,
+        'noiseSizeLabel':0,
+        'noiseSize':0,
+        'noiseSizeSeq':0,
+        'noiseFreqLabel':0,
+        'noiseFreq':0,
+        'noiseFreqSeq':0,
+        'cloudSFLabel':0,
+        'cloudSF':0,
+        'cloudSFBand':0,
+        'cloudSpeedLabel':0,
+        'cloudSpeedX':0,
+        'cloudSpeedY':0,
+        'cloudSpeedBandLabel':0,
+        'cloudSpeedBand':0,
+        'cloudOrientLabel':0,
+        'cloudOrient':0,
+        'cloudOrientBand':0,
+        'batchStimMenu':1,
+        'batchStimList':1,
+        'batchStimAdd':1,
+        'batchStimRemove':1
         }
 
         driftMotionSettings = {
@@ -3123,7 +3303,7 @@ class App(QMainWindow):
         width = 475 * scale_w
         height = 400 * scale_h
 
-        if system == 'Windows':
+        if system == 'Windows' or system == 'Linux':
             #fonts
             bold = QtGui.QFont("Roboto Light", 10,weight=QtGui.QFont.Bold)
             large = QtGui.QFont("Roboto Light", 11,weight=QtGui.QFont.Light)
@@ -3189,9 +3369,10 @@ class App(QMainWindow):
         self.objectTypeLabel.setFixedHeight(20 * scale_h)
 
         self.objectType = QComboBox(self)
-        self.objectType.addItems(['Circle','Rectangle','Grating','Noise','Cloud','Windmill','Annulus','Snake','Image'])
+        self.objectType.addItems(['Circle','Rectangle','Grating','Noise','Cloud','Windmill','Annulus','Snake','Image','Batch'])
         self.objectType.activated.connect(lambda: self.menuProc('objectType',self.objectType.currentText()))
         self.objectType.setFixedHeight(20 * scale_h)
+        self.objectType.setFixedWidth(100 * scale_w)
 
         self.designPanelLayout.addWidget(self.objectTypeLabel,5,0)
         self.designPanelLayout.addWidget(self.objectType,6,0,1,2)
@@ -3299,6 +3480,30 @@ class App(QMainWindow):
         self.imagePath.setFixedHeight(20 * scale_h)
 
         self.designPanelLayout.addWidget(self.imagePath,7,0,1,2)
+
+        #Batch stimulation. List all stimuli in drop down menu
+
+        stimList = self.getStimulusBank()
+
+        self.batchStimMenu = QComboBox(self)
+        self.batchStimMenu.clear()
+        self.batchStimMenu.addItems(stimList)
+        self.batchStimMenu.setFixedHeight(20 * scale_h)
+        self.batchStimMenu.setFixedWidth(100 * scale_w)
+        self.designPanelLayout.addWidget(self.batchStimMenu,7,0,1,2)
+
+        self.batchStimList = QListWidget(self)
+        self.designPanelLayout.addWidget(self.batchStimList,8,0,4,3)
+
+        self.batchStimAdd = QPushButton('+',self)
+        self.batchStimAdd.setFixedWidth(20 * scale_w)
+        self.designPanelLayout.addWidget(self.batchStimAdd,6,2,1,1)
+        self.batchStimAdd.clicked.connect(lambda: self.buttonProc("batchStimAdd"))
+
+        self.batchStimRemove = QPushButton('-',self)
+        self.batchStimRemove.setFixedWidth(20 * scale_w)
+        self.designPanelLayout.addWidget(self.batchStimRemove,7,2,1,1)
+        self.batchStimRemove.clicked.connect(lambda: self.buttonProc("batchStimRemove"))
 
         #Inner Diameter (annulus)
         self.innerDiameterLabel = QLabel('Inner',self)
@@ -3807,7 +4012,7 @@ class App(QMainWindow):
         width = 475 * scale_w
         height = 190 * scale_h
 
-        if system == 'Windows':
+        if system == 'Windows' or system == 'Linux':
             #fonts
             bold = QtGui.QFont("Roboto Light", 10,weight=QtGui.QFont.Bold)
             large = QtGui.QFont("Roboto Light", 11)
@@ -4002,7 +4207,7 @@ class App(QMainWindow):
         width = 475 * scale_w
         height = 400 * scale_h
 
-        if system == 'Windows':
+        if system == 'Windows' or system == 'Linux':
             #fonts
             bold = QtGui.QFont("Roboto Light", 10,weight=QtGui.QFont.Bold)
         elif system == 'Darwin':
@@ -4188,7 +4393,7 @@ class App(QMainWindow):
         width = 145 * scale_w
         height = 250 * scale_h
 
-        if system == 'Windows':
+        if system == 'Windows' or system == 'Linux':
             #fonts
             bold = QtGui.QFont("Roboto Light", 10,weight=QtGui.QFont.Bold)
         elif system == 'Darwin':
@@ -4296,7 +4501,7 @@ class App(QMainWindow):
         width = 145 * scale_w
         height = 350 * scale_h
 
-        if system == 'Windows':
+        if system == 'Windows' or system == 'Linux':
             #fonts
             bold = QtGui.QFont("Roboto Light", 10,weight=QtGui.QFont.Bold)
             large = QtGui.QFont("Roboto Light", 11,weight=QtGui.QFont.Light)
@@ -4313,8 +4518,9 @@ class App(QMainWindow):
         self.subFolder = QComboBox(self)
         self.subFolder.move(left,top-30 * scale_h)
         self.subFolder.resize(width,25 * scale_h)
-        self.subFolder.addItem('Ben')
+        self.subFolder.addItems(['Ben','Geoff'])
         self.subFolder.setFont(large)
+        self.subFolder.activated.connect(lambda: self.menuProc('subFolder',self.subFolder.currentText()))
 
         #Stimulus Bank
         self.stimBank = QListWidget(self)
@@ -4559,6 +4765,8 @@ class App(QMainWindow):
         #alphabetical order
         self.stimBank.sortItems(QtCore.Qt.AscendingOrder)
 
+        return stimList
+
     #finds all the images in the selected stimulus subfolder with .bmp extensions
     def getImageBank(self):
         subfolder = self.subFolder.currentText()
@@ -4582,10 +4790,7 @@ class App(QMainWindow):
 
     #is the string a decimal number?
     def isFloat(self,s):
-        if '.' in s:
-            return True
-        else:
-            return False
+        return '.' in s
 
     #creates a numpy array of a circle at the specified center point and radius
     def create_circular_mask(self,h, w, type, center=None, radius=None):
@@ -4663,8 +4868,6 @@ class App(QMainWindow):
 #Start the application
 if __name__ == '__main__':
 
-
-
     #create instance of application
     StimGen = QApplication([])
 
@@ -4675,7 +4878,7 @@ if __name__ == '__main__':
     StimGen.setStyle('Fusion')
 
     system = platform.system()
-    if system == 'Windows':
+    if system == 'Windows' or system == 'Linux':
         #fonts
         myFont = QtGui.QFont('Roboto Light', 10,weight=QtGui.QFont.Light)
 
