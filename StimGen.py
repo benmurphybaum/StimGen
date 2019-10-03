@@ -1256,15 +1256,20 @@ class App(QMainWindow):
         global win,isOpen,ifi,main
 
         bgnd = self.getBackground()
-        print(self.monitor.currentText())
+
+        #get the resolution of the selected monitor
+        monitor = int(self.monitor.currentText())
+        resolution = QDesktopWidget().screenGeometry(monitor)
+
         win = visual.Window(
-            size=[400,400],
+            size=[resolution.width(),resolution.height()],
             units="pix",
             fullscr=False,
             color=[bgnd, bgnd, bgnd],
             allowStencil=True,
             winType = 'pyglet',
-            screen = int(self.monitor.currentText()),
+            screen = monitor,
+            allowGUI = False,
             gamma = float(self.gammaTable.currentText())
         )
 
@@ -4505,7 +4510,11 @@ class App(QMainWindow):
         self.monitorLabel= QLabel('Monitor')
 
         #Find number of monitors
-        self.monitor.addItems(['1','2'])
+        numScreens = QDesktopWidget().screenCount()
+
+        for i in range(0,numScreens):
+            self.monitor.addItem(str(i))
+
         self.globalsLayout.addWidget(self.monitorLabel,1,0,1,2)
         self.monitorLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.globalsLayout.addWidget(self.monitor,1,2)
