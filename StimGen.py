@@ -1293,24 +1293,28 @@ class App(QMainWindow):
     def runStim(self):
         global runTime,stimID
 
-        # stimulus = self.stimBank.currentItem()
+        originalStimulus = self.stimBank.currentItem()
         # index = self.stimBank.currentRow()
-        originalStimName = 'testSpot'
+        originalStimName = originalStimulus.text()
 
         #BATCH STIMULUS LOOP
         if stim[0]['objectType'] == 'Batch':
+            isBatch = 1
             numBatchStimuli = len(stim[0]['batchStimList'])
             stimList = stim[0]['batchStimList'] #save copy of the batch list
         else:
+            isBatch = 0
             numBatchStimuli = 1
+            stimList = [originalStimName]
 
         if numBatchStimuli == 0:
             return #abort stimulus if none were defined
 
         for batchStim in range(numBatchStimuli):
             #fetch the stimulus dictionary for each subsequent batch stimulus
-            theStimulus = stimList[batchStim]
-            self.fetchStimDict(theStimulus)
+            if isBatch:
+                theStimulus = stimList[batchStim]
+                self.fetchStimDict(theStimulus)
 
             #stimID
             stimID = self.stimID.text()
