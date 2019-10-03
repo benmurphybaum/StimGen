@@ -38,7 +38,7 @@ import copy
 #PsychoPy
 from psychopy import visual, clock, core, monitors#, parallel
 
-import math, platform
+import platform
 
 #Motion Clouds
 import MotionClouds as mc
@@ -230,10 +230,11 @@ class App(QMainWindow):
         global isOpen
         isOpen = 0 #stimulus window is closed
 
-
     #Handles all variable entries
     def variableProc(self,controlName,entry):
         global stim, seqDict, maskDict
+
+        ppm = float(self.ppm.text())
 
         #Need to check each variable for validity
         if controlName == 'background':
@@ -244,7 +245,20 @@ class App(QMainWindow):
                 #Double flip, one to send new bgnd to buffer, then another to flip buffer to screen
                 #Flip the sync spot
                 win.flip()
-                self.drawSyncSpot(-1) #draw sync spot to dark if it's checked
+
+                #build the sync spot stimulus object
+                syncSpot = visual.Rect(
+                win = win,
+                units = 'pix',
+                width = 80 * ppm,
+                height = 80 * ppm,
+                fillColor = [1,1,1],
+                lineColor = [1,1,1],
+                contrast = -1,
+                pos = (532-40,-404+40)
+                )
+
+                self.drawSyncSpot(syncSpot,-1) #draw sync spot to dark if it's checked
                 win.flip()
             except:
                 return
@@ -291,7 +305,7 @@ class App(QMainWindow):
 
     #Handles all button clicks
     def buttonProc(self,controlName):
-        global isOpen, abortStatus, saveToPath, stimPath, stimID
+        global isOpen, abortStatus, saveToPath, stimPath, stimID, stim
 
         if  controlName == 'designButton':
             self.designPanel.show()
@@ -305,6 +319,7 @@ class App(QMainWindow):
 
             #Bug when masks are changed sometimes grating settings go back to circle settings
             self.setContextualMenus() #ensures that the parameters have the correct settings.
+
 
         elif controlName == 'masksButton':
             self.designPanel.hide()
@@ -425,15 +440,29 @@ class App(QMainWindow):
             self.saveToPath.setText(saveToPath)
 
         elif controlName == 'batchStimAdd':
-            stim = self.batchStimMenu.currentText()
-            self.batchStimList.addItem(stim)
+            stimName = self.batchStimMenu.currentText()
+            self.batchStimList.addItem(stimName)
+
+            currentObject = self.objectListBox.currentItem()
+            objectNum = self.objectListBox.row(currentObject)
+            print(stim[objectNum]['batchStimList'])
+            stim[objectNum]['batchStimList'].append(stimName)
 
         elif controlName == 'batchStimRemove':
             #selected item and its index
             item = self.batchStimList.currentItem()
+            index = self.batchStimList.row(item)
 
-            #delete trajectory from the list box
-            self.batchStimList.takeItem(self.batchStimList.row(item))
+            if index == -1:
+                return
+
+            #delete stimulus from the list box
+            self.batchStimList.takeItem(index)
+
+            #remove stimulus item from the stim dict
+            currentObject = self.objectListBox.currentItem()
+            objectNum = self.objectListBox.row(currentObject)
+            stim[objectNum]['batchStimList'].pop(index)
         else:
             #default
             print('other')
@@ -957,6 +986,12 @@ class App(QMainWindow):
                 #flip the controls depending on the drop down menu selection
                 self.flipControls(key,val)
 
+
+        #populate the batch list box
+        self.batchStimList.clear()
+        self.batchStimList.addItems(stim[index]['batchStimList'])
+        self.batchStimList.setCurrentRow(0)
+
         #check sequence assignments
         for key,_ in seqAssign[index].iteritems():
             sequence = seqAssign[index][key]['sequence']
@@ -1101,9 +1136,12 @@ class App(QMainWindow):
             self.flipControls('motionType',self.motionType.currentText())
 
         elif selection == 'Batch':
+            index = self.stimBank.currentRow()
+
             self.batchStimMenu.clear()
             stimList = self.getStimulusBank()
             self.batchStimMenu.addItems(stimList)
+            self.stimBank.setCurrentRow(index)
 
             for key,value in batchSettings.iteritems():
                 if value == 0:
@@ -1207,20 +1245,9 @@ class App(QMainWindow):
             return
 
     #flips the sync spot on or off
-    def drawSyncSpot(self,contrastVal):
-        ppm = float(self.ppm.text())
+    def drawSyncSpot(self,syncSpot,contrastVal):
         if self.syncSpot.isChecked():
-            syncSpot = visual.Rect(
-            win = win,
-            units = 'pix',
-            width = 80 * ppm,
-            height = 80 * ppm,
-            fillColor = [1,1,1],
-            lineColor = [1,1,1],
-            contrast = contrastVal,
-            pos = (532-40,-404+40)
-            )
-
+            syncSpot.setContrast(contrastVal)
             if isOpen == 1:
                 syncSpot.draw()
 
@@ -1229,11 +1256,11 @@ class App(QMainWindow):
         global win,isOpen,ifi,main
 
         bgnd = self.getBackground()
-
+        print(self.monitor.currentText())
         win = visual.Window(
-            size=[1024,768],
+            size=[400,400],
             units="pix",
-            fullscr=True,
+            fullscr=False,
             color=[bgnd, bgnd, bgnd],
             allowStencil=True,
             winType = 'pyglet',
@@ -1246,114 +1273,137 @@ class App(QMainWindow):
         ifi = 1/win.getActualFrameRate(10,100)
         isOpen = 1 #window is open
 
-        self.drawSyncSpot(-1) #dark sync spot
+        ppm = float(self.ppm.text())
+
+        #build the sync spot stimulus object
+        syncSpot = visual.Rect(
+        win = win,
+        units = 'pix',
+        width = 80 * ppm,
+        height = 80 * ppm,
+        fillColor = [1,1,1],
+        lineColor = [1,1,1],
+        contrast = -1,
+        pos = (532-40,-404+40)
+        )
+        self.drawSyncSpot(syncSpot,-1) #dark sync spot
         win.flip()
 
     #Fills out the stimulus parameters into a structure
     def runStim(self):
         global runTime,stimID
 
-        #stimID
-        stimID = self.stimID.text()
-        if len(stimID) == 0:
-            stimID = 0
+        # stimulus = self.stimBank.currentItem()
+        # index = self.stimBank.currentRow()
+        originalStimName = 'testSpot'
+
+        #BATCH STIMULUS LOOP
+        if stim[0]['objectType'] == 'Batch':
+            numBatchStimuli = len(stim[0]['batchStimList'])
+            stimList = stim[0]['batchStimList'] #save copy of the batch list
         else:
-            stimID = int(stimID)
+            numBatchStimuli = 1
 
-        #stim dictionary holds the parameters for all the objects
-        numObjects = len(stim)
+        if numBatchStimuli == 0:
+            return #abort stimulus if none were defined
 
-        #global parameters
-        ppm = float(self.ppm.text())
-        xOffset = int(self.xOffset.text())
-        yOffset = int(self.yOffset.text())
-        trialTime = float(self.trialTime.text())
-        repeats = int(self.repeats.text())
+        for batchStim in range(numBatchStimuli):
+            #fetch the stimulus dictionary for each subsequent batch stimulus
+            theStimulus = stimList[batchStim]
+            self.fetchStimDict(theStimulus)
 
-        #sync spot
-        self.drawSyncSpot(-1) #dark sync spot
-        win.flip()
+            #stimID
+            stimID = self.stimID.text()
+            if len(stimID) == 0:
+                stimID = 0
+            else:
+                stimID = int(stimID)
 
-        if self.loopCheck.isChecked() == True:
-            repeats = 1000
-        bgnd = self.getBackground()
+            #stim dictionary holds the parameters for all the objects
+            numObjects = len(stim)
 
-        #runTime dictionary is created here, and will hold parameters
-        #calculated at run time for each object
-        runTime = {}
-        #Timer dictionaries
-        timer = {}
+            #global parameters
+            ppm = float(self.ppm.text())
+            xOffset = int(self.xOffset.text())
+            yOffset = int(self.yOffset.text())
+            trialTime = float(self.trialTime.text())
+            repeats = int(self.repeats.text())
 
-        #define the masks/aperture
-        if stim[0]['apertureStatus'] == 'On':
-            aperture = visual.Aperture(
+            #build the sync spot stimulus object
+            syncSpot = visual.Rect(
             win = win,
             units = 'pix',
-            shape = 'circle',
-            size = stim[0]['apertureDiam'] * ppm,
-            inverted = False,
-            pos = (xOffset * ppm,yOffset * ppm)
+            width = 80 * ppm,
+            height = 80 * ppm,
+            fillColor = [1,1,1],
+            lineColor = [1,1,1],
+            contrast = -1,
+            pos = (532-40,-404+40)
             )
-            aperture.enabled = True
 
-        #parallel port address
-        # port = parallel.ParallelPort(address=0x0378)
-        # print(port)
+            self.drawSyncSpot(syncSpot,-1) #dark sync spot
+            win.flip()
 
-        #make empty runtime dictionary
-        #holds parameters that change with time during the stimulus
-        for i in range(numObjects):
-            runTime[i] = {
-            'delayFrames':0,
-            'frames':0,
-            'startX':0,
-            'startY':0,
-            'halfCycle':0,
-            'cycleCount':1,
-            'phase':0,
-            'driftIncrement':0,
-            'firstIntensity':0,
-            'secondIntensity':0,
-            'stimulus':0,
-            'stimFrame':0,
-            'trajectory':{
-                'angle':[],
-                'startFrame':[],
-                'finalX':[],
-                'finalY':[]
-            }
-            }
+            if self.loopCheck.isChecked() == True:
+                repeats = 1000
+            bgnd = self.getBackground()
 
-            timer[i] = 0
+            #runTime dictionary is created here, and will hold parameters
+            #calculated at run time for each object
+            runTime = {}
+            #Timer dictionaries
+            timer = {}
 
-        #start at 0 sweeps
-        numSweeps = 0
+            #define the masks/aperture
+            if stim[0]['apertureStatus'] == 'On':
+                aperture = visual.Aperture(
+                win = win,
+                units = 'pix',
+                shape = 'circle',
+                size = stim[0]['apertureDiam'] * ppm,
+                inverted = False,
+                pos = (xOffset * ppm,yOffset * ppm)
+                )
+                aperture.enabled = True
 
-        #check for sequence assignments to get the total number of sweeps
-        for i in range(numObjects):
-            for key,_ in seqAssign[i].iteritems():
-                sequence = seqAssign[i][key]['sequence']
-                if sequence != 'None':
-                    #extract sequence entry
-                    entry = seqDict[sequence]
+            #parallel port address
+            # port = parallel.ParallelPort(address=0x0378)
+            # print(port)
 
-                    #size of entry
-                    size = len(entry)
-                    if size > numSweeps:
-                        numSweeps = size
-            #if trajectory, check if it contains sequences and add them to the sweep count
-            if stim[i]['trajectory'] != 'None':
-                name = stim[i]['trajectory']
-                numSegments = len(trajDict[name]['angle'])
+            #make empty runtime dictionary
+            #holds parameters that change with time during the stimulus
+            for i in range(numObjects):
+                runTime[i] = {
+                'delayFrames':0,
+                'frames':0,
+                'startX':0,
+                'startY':0,
+                'halfCycle':0,
+                'cycleCount':1,
+                'phase':0,
+                'driftIncrement':0,
+                'firstIntensity':0,
+                'secondIntensity':0,
+                'stimulus':0,
+                'stimFrame':0,
+                'trajectory':{
+                    'angle':[],
+                    'startFrame':[],
+                    'finalX':[],
+                    'finalY':[]
+                }
+                }
 
-                for segment in range(numSegments):
-                    if trajDict[name]['angle'][segment].isnumeric():
-                        #numeric entry
-                        continue
-                    elif str(trajDict[name]['angle'][segment]) in seqList:
-                        #is the entry a sequence?
-                        #If so, replace the trajectory segment with the sequence entry for the current sweep
-                        sequence = str(trajDict[name]['angle'][segment])
+                timer[i] = 0
+
+            #start at 0 sweeps
+            numSweeps = 0
+
+            #check for sequence assignments to get the total number of sweeps
+            for i in range(numObjects):
+                for key,_ in seqAssign[i].iteritems():
+                    sequence = seqAssign[i][key]['sequence']
+                    if sequence != 'None':
                         #extract sequence entry
                         entry = seqDict[sequence]
 
@@ -1362,293 +1412,313 @@ class App(QMainWindow):
                         if size > numSweeps:
                             numSweeps = size
 
-            #frame delay for each objectType
-            runTime[i]['delayFrames'] = int(round(stim[i]['delay']/ifi)) #round to nearest integer
+                #if trajectory, check if it contains sequences and add them to the sweep count
+                if stim[i]['trajectory'] != 'None':
+                    name = stim[i]['trajectory']
+                    numSegments = len(trajDict[name]['angle'])
 
-            #frame duration for each object
-            runTime[i]['frames'] = int(round(stim[i]['duration']/ifi)) #round to nearest integer
-
-        #What is the total duration of the stimulus, including delays?
-        durList = []
-        durList = [runTime[i]['delayFrames'] + runTime[i]['frames'] for i in range(numObjects)]
-        totalDuration = max(durList)
-
-        #if no sequences are assigned or they are all empty, set sweeps to 1
-        if numSweeps == 0:
-            numSweeps = 1
-
-        #STIMULUS LOOP #Loop through repeats
-        for repeat in range(repeats): #use repeat setting for first object
-
-            #loop through sweeps from sequence assignments
-            for sweep in range(numSweeps):
-
-                #check for abort click
-                if abortStatus:
-                    return
-
-                #reset frame counts
-                frameCount = 0
-
-
-
-                #check for sequence assignments and fill runtime dictionary
-                for i in range(numObjects):
-                    for key,_ in seqAssign[i].iteritems():
-                        sequence = seqAssign[i][key]['sequence']
-                        if sequence != 'None':
+                    for segment in range(numSegments):
+                        if trajDict[name]['angle'][segment].isnumeric():
+                            #numeric entry
+                            continue
+                        elif str(trajDict[name]['angle'][segment]) in seqList:
+                            #is the entry a sequence?
+                            #If so, replace the trajectory segment with the sequence entry for the current sweep
+                            sequence = str(trajDict[name]['angle'][segment])
                             #extract sequence entry
                             entry = seqDict[sequence]
-                            #parent control name
-                            parent = seqAssign[i][key]['parent']
-                            #insert sequence variable into the stim dictionary for each sweep
-                            stim[i][parent] = float(entry[sweep])
 
-                    #Set runTime dictionary for each sweeps
-                    #piggy backs off the seqAssign loop, which also iterates through the objects
+                            #size of entry
+                            size = len(entry)
+                            if size > numSweeps:
+                                numSweeps = size
 
-                    #frame delay for each objectType
-                    runTime[i]['delayFrames'] = int(round(stim[i]['delay']/ifi)) #round to nearest integer
+                #frame delay for each objectType
+                runTime[i]['delayFrames'] = int(round(stim[i]['delay']/ifi)) #round to nearest integer
 
-                    #frame duration for each object
-                    runTime[i]['frames'] = int(round(stim[i]['duration']/ifi)) #round to nearest integer
+                #frame duration for each object
+                runTime[i]['frames'] = int(round(stim[i]['duration']/ifi)) #round to nearest integer
 
-                    #starting positions of each object
-                    runTime[i]['startX'] = ppm * (xOffset + stim[i]['xPos']) + ppm * stim[i]['startRad'] * np.cos(stim[i]['angle'] * np.pi/180.)
-                    runTime[i]['startY'] = ppm * (yOffset + stim[i]['yPos']) + ppm * stim[i]['startRad'] * np.sin(stim[i]['angle'] * np.pi/180.)
+            #What is the total duration of the stimulus, including delays?
+            durList = []
+            durList = [runTime[i]['delayFrames'] + runTime[i]['frames'] for i in range(numObjects)]
+            totalDuration = max(durList)
 
-                    #Motion parameters
-                    if stim[i]['motionType'] == 'Drift':
-                        #if stim[i]['objectType'] == 'Grating':
-                        runTime[i]['driftIncrement'] =  stim[i]['driftFreq'] * ifi
-                                # elif stim[i]['objectType'] == 'Windmill':
-                                #   runTime[i]['driftIncrement'] = stim[i]['driftFreq'] * ifi
+            #if no sequences are assigned or they are all empty, set sweeps to 1
+            if numSweeps == 0:
+                numSweeps = 1
 
-                    #Modulation parameters
-                    if (stim[i]['modulationType'] == 'Square') or (stim[i]['modulationType'] == 'Sine'):
-                        runTime[i]['halfCycle'] = int(round((0.5/stim[i]['modulationFreq'])/ifi)) # number of frames per half cycle
-                        runTime[i]['cycleCount'] = 1
+            #STIMULUS LOOP #Loop through repeats
+            for repeat in range(repeats): #use repeat setting for first object
 
-                    elif stim[i]['modulationType'] == 'Chirp':
-                        chirpWave = self.buildChirp(i,ifi)
-                        #make sure total duration matches frame number if the stimulus is a chirp
-                        stim[i]['contrast'] = 100
-                        totalDuration = chirpWave.shape[0]
-                        runTime[i]['frames'] = totalDuration
+                #loop through sweeps from sequence assignments
+                for sweep in range(numSweeps):
 
-                    #noise frames per cycle
-                    if stim[i]['objectType'] == 'Noise':
-                        runTime[i]['halfCycle'] = int(round((0.5/stim[i]['noiseFreq'])/ifi)) # number of frames per half cycle
-                        runTime[i]['cycleCount'] = 1
+                    #check for abort click
+                    if abortStatus:
+                        return
 
-                    runTime[i]['phase'] = stim[i]['spatialPhase'] / 360.
+                    #reset frame counts
+                    frameCount = 0
 
-                    #intensities
-                    firstIntensity,secondIntensity = self.getIntensity(i)
-                    runTime[i]['firstIntensity'] = firstIntensity
-                    runTime[i]['secondIntensity'] = secondIntensity
-
-                    #Define stimulus
-                    runTime[i]['stimulus'] = self.defineStimulus(runTime,ppm,xOffset,yOffset,i,ifi)
-
-                    #reset stimulus frame counts
-                    runTime[i]['stimFrame'] = 0
-                    #reset cycle counts
-                    runTime[i]['cycleCount'] = 1
-
-                    #calculate trajectory frames
-                    if stim[i]['trajectory'] != 'None':
-                        self.calculateTrajectory(stim[i]['trajectory'],i,sweep,ifi,ppm,xOffset,yOffset)
-                        runTime[i]['frames'] = len(trajectoryStim[i]['yPos'])
-
-
-                #define the masks/aperture
-                if stim[0]['apertureStatus'] == 'On':
-                    aperture = visual.Aperture(
-                    win = win,
-                    units = 'pix',
-                    shape = 'circle',
-                    size = stim[0]['apertureDiam'] * ppm,
-                    inverted = False,
-                    pos = (xOffset * ppm,yOffset * ppm)
-                    )
-                    aperture.enabled = True
-
-
-                #Wait for trigger
-                if self.trigger.currentText() == 'Wait For Trigger':
-                    with ni.Task() as task:
-                        task.di_channels.add_di_chan('PCI6036/port0/line0')
-                        trigger = False
-                        while trigger == False:
-                            #read digital input P0.0 from the ephys board
-                            trigger = task.read()
-                elif self.trigger.currentText() == 'Send Trigger':
-                    with ni.Task() as task:
-                        #send digital pulse through P0.0 from the ephys board
-                        task.do_channels.add_do_chan('PCI6036/port0/line0')
-                        task.write(False)
-                        task.write(True)
-                        task.write(False)
-
-
-                #overall timer that is started before delay
-                totalTimer = 0
-                totalTimer = core.Clock()
-
-                #loop through total stimulus duration
-                for frame in range(totalDuration):
-                    #flip sync spot to dark as default
-                    self.drawSyncSpot(-1)
-
-                    #Loop through each object
+                    #check for sequence assignments and fill runtime dictionary
                     for i in range(numObjects):
+                        for key,_ in seqAssign[i].iteritems():
+                            sequence = seqAssign[i][key]['sequence']
+                            if sequence != 'None':
+                                #extract sequence entry
+                                entry = seqDict[sequence]
+                                #parent control name
+                                parent = seqAssign[i][key]['parent']
+                                #insert sequence variable into the stim dictionary for each sweep
+                                stim[i][parent] = float(entry[sweep])
 
-                        #extract stimulus intensity so you only do it once per object
-                        firstIntensity = runTime[i]['firstIntensity']
-                        secondIntensity = runTime[i]['secondIntensity']
+                        #Set runTime dictionary for each sweeps
+                        #piggy backs off the seqAssign loop, which also iterates through the objects
 
-                        #delay
-                        if frame < runTime[i]['delayFrames']:
-                            continue
+                        #frame delay for each objectType
+                        runTime[i]['delayFrames'] = int(round(stim[i]['delay']/ifi)) #round to nearest integer
 
-                        #duration
-                        if frame >= runTime[i]['delayFrames'] + runTime[i]['frames']:
-                            continue
+                        #frame duration for each object
+                        runTime[i]['frames'] = int(round(stim[i]['duration']/ifi)) #round to nearest integer
+
+                        #starting positions of each object
+                        runTime[i]['startX'] = ppm * (xOffset + stim[i]['xPos']) + ppm * stim[i]['startRad'] * np.cos(stim[i]['angle'] * np.pi/180.)
+                        runTime[i]['startY'] = ppm * (yOffset + stim[i]['yPos']) + ppm * stim[i]['startRad'] * np.sin(stim[i]['angle'] * np.pi/180.)
+
+                        #Motion parameters
+                        if stim[i]['motionType'] == 'Drift':
+                            #if stim[i]['objectType'] == 'Grating':
+                            runTime[i]['driftIncrement'] =  stim[i]['driftFreq'] * ifi
+                                    # elif stim[i]['objectType'] == 'Windmill':
+                                    #   runTime[i]['driftIncrement'] = stim[i]['driftFreq'] * ifi
+
+                        #Modulation parameters
+                        if (stim[i]['modulationType'] == 'Square') or (stim[i]['modulationType'] == 'Sine'):
+                            runTime[i]['halfCycle'] = int(round((0.5/stim[i]['modulationFreq'])/ifi)) # number of frames per half cycle
+                            runTime[i]['cycleCount'] = 1
+
+                        elif stim[i]['modulationType'] == 'Chirp':
+                            chirpWave = self.buildChirp(i,ifi)
+                            #make sure total duration matches frame number if the stimulus is a chirp
+                            stim[i]['contrast'] = 100
+                            totalDuration = chirpWave.shape[0]
+                            runTime[i]['frames'] = totalDuration
+
+                        #noise frames per cycle
+                        if stim[i]['objectType'] == 'Noise':
+                            runTime[i]['halfCycle'] = int(round((0.5/stim[i]['noiseFreq'])/ifi)) # number of frames per half cycle
+                            runTime[i]['cycleCount'] = 1
+
+                        runTime[i]['phase'] = stim[i]['spatialPhase'] / 360.
+
+                        #intensities
+                        firstIntensity,secondIntensity = self.getIntensity(i)
+                        runTime[i]['firstIntensity'] = firstIntensity
+                        runTime[i]['secondIntensity'] = secondIntensity
+
+                        #Define stimulus
+                        runTime[i]['stimulus'] = self.defineStimulus(runTime,ppm,xOffset,yOffset,i,ifi)
+
+                        #reset stimulus frame counts
+                        runTime[i]['stimFrame'] = 0
+                        #reset cycle counts
+                        runTime[i]['cycleCount'] = 1
+
+                        #calculate trajectory frames
+                        if stim[i]['trajectory'] != 'None':
+                            self.calculateTrajectory(stim[i]['trajectory'],i,sweep,ifi,ppm,xOffset,yOffset)
+                            runTime[i]['frames'] = len(trajectoryStim[i]['yPos'])
 
 
-                        #sync spot bright
-                        self.drawSyncSpot(1)
+                    #define the masks/aperture
+                    if stim[0]['apertureStatus'] == 'On':
+                        aperture = visual.Aperture(
+                        win = win,
+                        units = 'pix',
+                        shape = 'circle',
+                        size = stim[0]['apertureDiam'] * ppm,
+                        inverted = False,
+                        pos = (xOffset * ppm,yOffset * ppm)
+                        )
+                        aperture.enabled = True
 
-                        #start timer only on first frame of the stimulus
-                        # if runTime[i]['stimFrame'] == 0:
-                        #     timer[i] = 0
-                        #     timer[i] = core.Clock()
 
-                        #check for abort click
-                        if abortStatus:
-                            #Flip the window to background again
-                            self.drawSyncSpot(-1)
-                            win.flip()
-                            return
+                    #Wait for trigger
+                    if self.trigger.currentText() == 'Wait For Trigger':
+                        with ni.Task() as task:
+                            task.di_channels.add_di_chan('PCI6036/port0/line0')
+                            trigger = False
+                            while trigger == False:
+                                #read digital input P0.0 from the ephys board
+                                trigger = task.read()
+                    elif self.trigger.currentText() == 'Send Trigger':
+                        with ni.Task() as task:
+                            #send digital pulse through P0.0 from the ephys board
+                            task.do_channels.add_do_chan('PCI6036/port0/line0')
+                            task.write(False)
+                            task.write(True)
+                            task.write(False)
 
-                        #Update stimulus parameters and Draw each stimulus object to the buffer window
 
-                        #MOTION CLOUD STIMULI
-                        if stim[i]['objectType'] == 'Cloud':
-                            #get the motion cloud frame
+                    #overall timer that is started before delay
+                    totalTimer = 0
+                    totalTimer = core.Clock()
 
-                            stimulus = visual.ImageStim(
-                                win=win,
-                                units = 'pix',
-                                image = motionCloud[:,:,runTime[i]['stimFrame']],
-                                size = (1024,768),
-                                ori = stim[i]['orientation'],
-                                pos = ((xOffset + stim[i]['xPos']) * ppm,(yOffset + stim[i]['yPos']) * ppm)
-                                )
+                    #loop through total stimulus duration
+                    for frame in range(totalDuration):
 
-                            runTime[i]['stimulus'] = stimulus
+                        #flip sync spot to dark as default
+                        self.drawSyncSpot(syncSpot,-1)
 
-                        #NOISE STIMULI
-                        elif stim[i]['objectType'] == 'Noise':
-                            #Flip the intensities between light/dark at each cycle
-                            if runTime[i]['stimFrame'] == runTime[i]['halfCycle'] * runTime[i]['cycleCount']:
-                                #if number of cycles divided by 2 is an even number we need to update the parameters
-                                if (runTime[i]['cycleCount'] % 2) == 0:
-                                    runTime[i]['stimulus'].updateNoise()
-                                runTime[i]['cycleCount'] = runTime[i]['cycleCount'] + 1 #counts which modulation cycle it's on
+                        #Loop through each object
+                        for i in range(numObjects):
 
-                        elif stim[i]['objectType'] == 'Snake':
-                            xdist = ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.cos(stim[i]['angle'] * np.pi/180)
-                            ydist = ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.sin(stim[i]['angle'] * np.pi/180)
+                            #extract stimulus intensity so you only do it once per object
+                            firstIntensity = runTime[i]['firstIntensity']
+                            secondIntensity = runTime[i]['secondIntensity']
 
-                            x = runTime[i]['startX'] + xdist/2.
-                            y = runTime[i]['startY'] + ydist/2.
+                            #delay
+                            if frame < runTime[i]['delayFrames']:
+                                continue
 
-                            runTime[i]['stimulus'].pos = (x,y)
-                            runTime[i]['stimulus'].width = ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi)
+                            #duration
+                            if frame >= runTime[i]['delayFrames'] + runTime[i]['frames']:
+                                continue
 
-                        #ALL OTHER STIMULI
-                        else:
-                            #Update position for moving stimuli
-                            if stim[i]['motionType'] == 'Drift':
-                                if stim[i]['objectType'] == 'Grating':
-                                    runTime[i]['stimulus'].phase = runTime[i]['phase'] + runTime[i]['driftIncrement'] * runTime[i]['stimFrame']
-                                elif stim[i]['objectType'] == 'Windmill':
-                                    if stim[i]['turnDirection'] == 'Clockwise':
-                                        runTime[i]['stimulus'].setOri(stim[i]['orientation'] + runTime[i]['driftIncrement'] * runTime[i]['stimFrame'])
-                                    elif stim[i]['turnDirection'] == 'Counterclockwise':
-                                        runTime[i]['stimulus'].setOri(stim[i]['orientation'] - runTime[i]['driftIncrement'] * runTime[i]['stimFrame'])
-                                else:
-                                    if stim[i]['trajectory'] == 'None':
-                                        # x = runTime[i]['startX'] + ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.cos(stim[i]['angle'] * np.pi/180)
-                                        # y = runTime[i]['startY'] + ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.sin(stim[i]['angle'] * np.pi/180)
-                                        # runTime[i]['stimulus'].pos = (x,y)
-                                        stimulus = visual.ImageStim(
-                                            win=win,
-                                            units = 'pix',
-                                            image = stimArray[:,:,runTime[i]['stimFrame']],
-                                            size = (1024,768),
-                                            )
-                                    else:
-                                        runTime[i]['stimulus'].pos = self.getTrajectoryPosition(i)
 
-                            #Update intensity for modulated stimuli
+                            #sync spot bright
+                            self.drawSyncSpot(syncSpot,1)
 
-                            if stim[i]['modulationType'] == 'Square':
+                            #start timer only on first frame of the stimulus
+                            # if runTime[i]['stimFrame'] == 0:
+                            #     timer[i] = 0
+                            #     timer[i] = core.Clock()
+
+                            #check for abort click
+                            if abortStatus:
+                                #Flip the window to background again
+                                self.drawSyncSpot(syncSpot,-1)
+                                win.flip()
+                                return
+
+                            #Update stimulus parameters and Draw each stimulus object to the buffer window
+
+                            #MOTION CLOUD STIMULI
+                            if stim[i]['objectType'] == 'Cloud':
+                                #get the motion cloud frame
+
+                                stimulus = visual.ImageStim(
+                                    win=win,
+                                    units = 'pix',
+                                    image = motionCloud[:,:,runTime[i]['stimFrame']],
+                                    size = (1024,768),
+                                    ori = stim[i]['orientation'],
+                                    pos = ((xOffset + stim[i]['xPos']) * ppm,(yOffset + stim[i]['yPos']) * ppm)
+                                    )
+
+                                runTime[i]['stimulus'] = stimulus
+
+                            #NOISE STIMULI
+                            elif stim[i]['objectType'] == 'Noise':
                                 #Flip the intensities between light/dark at each cycle
                                 if runTime[i]['stimFrame'] == runTime[i]['halfCycle'] * runTime[i]['cycleCount']:
-
+                                    #if number of cycles divided by 2 is an even number we need to update the parameters
                                     if (runTime[i]['cycleCount'] % 2) == 0:
-                                        runTime[i]['stimulus'].contrast = firstIntensity
-                                    else:
-                                        runTime[i]['stimulus'].contrast = secondIntensity
-
+                                        runTime[i]['stimulus'].updateNoise()
                                     runTime[i]['cycleCount'] = runTime[i]['cycleCount'] + 1 #counts which modulation cycle it's on
 
-                            elif stim[i]['modulationType'] == 'Sine':
-                                #out of bounds intensities
-                                if firstIntensity - bgnd > 1:
-                                    firstIntensity = bgnd + 1
-                                elif firstIntensity - bgnd < -1:
-                                    firstIntensity = bgnd - 1
+                            elif stim[i]['objectType'] == 'Snake':
+                                xdist = ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.cos(stim[i]['angle'] * np.pi/180)
+                                ydist = ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.sin(stim[i]['angle'] * np.pi/180)
 
-                                runTime[i]['stimulus'].contrast = (stim[i]['contrast']/100.0) * np.sin(2 * np.pi * stim[i]['modulationFreq'] * (runTime[i]['stimFrame'] * ifi))
+                                x = runTime[i]['startX'] + xdist/2.
+                                y = runTime[i]['startY'] + ydist/2.
 
-                            elif stim[i]['modulationType'] == 'Chirp':
-                                runTime[i]['stimulus'].contrast = chirpWave[runTime[i]['stimFrame']]
+                                runTime[i]['stimulus'].pos = (x,y)
+                                runTime[i]['stimulus'].width = ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi)
 
-                        runTime[i]['stimulus'].draw() #draws every frame
+                            #ALL OTHER STIMULI
+                            else:
+                                #Update position for moving stimuli
+                                if stim[i]['motionType'] == 'Drift':
+                                    if stim[i]['objectType'] == 'Grating':
+                                        runTime[i]['stimulus'].phase = runTime[i]['phase'] + runTime[i]['driftIncrement'] * runTime[i]['stimFrame']
+                                    elif stim[i]['objectType'] == 'Windmill':
+                                        if stim[i]['turnDirection'] == 'Clockwise':
+                                            runTime[i]['stimulus'].setOri(stim[i]['orientation'] + runTime[i]['driftIncrement'] * runTime[i]['stimFrame'])
+                                        elif stim[i]['turnDirection'] == 'Counterclockwise':
+                                            runTime[i]['stimulus'].setOri(stim[i]['orientation'] - runTime[i]['driftIncrement'] * runTime[i]['stimFrame'])
+                                    else:
+                                        if stim[i]['trajectory'] == 'None':
 
-                        if stim[i]['gratingType'] == 'Plaid':
-                            ortho.draw()
+                                            x = runTime[i]['startX'] + ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.cos(stim[i]['angle'] * np.pi/180)
+                                            y = runTime[i]['startY'] + ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.sin(stim[i]['angle'] * np.pi/180)
+                                            runTime[i]['stimulus'].setPos((x,y))
 
-                        #draw the mask if it is defined
-                        for index,_ in maskDict.iteritems():
-                            mask[index].draw()
-                        #     mask[i].draw()
+                                        else:
+                                            runTime[i]['stimulus'].pos = self.getTrajectoryPosition(i)
 
-                        #increase stimFrame count if the code has reached here
-                        runTime[i]['stimFrame'] = runTime[i]['stimFrame'] + 1
+                                #Update intensity for modulated stimuli
 
-                    #Flip the window every loop no matter what
+                                if stim[i]['modulationType'] == 'Square':
+                                    #Flip the intensities between light/dark at each cycle
+                                    if runTime[i]['stimFrame'] == runTime[i]['halfCycle'] * runTime[i]['cycleCount']:
+
+                                        if (runTime[i]['cycleCount'] % 2) == 0:
+                                            runTime[i]['stimulus'].contrast = firstIntensity
+                                        else:
+                                            runTime[i]['stimulus'].contrast = secondIntensity
+
+                                        runTime[i]['cycleCount'] = runTime[i]['cycleCount'] + 1 #counts which modulation cycle it's on
+
+                                elif stim[i]['modulationType'] == 'Sine':
+                                    #out of bounds intensities
+                                    if firstIntensity - bgnd > 1:
+                                        firstIntensity = bgnd + 1
+                                    elif firstIntensity - bgnd < -1:
+                                        firstIntensity = bgnd - 1
+
+                                    runTime[i]['stimulus'].contrast = (stim[i]['contrast']/100.0) * np.sin(2 * np.pi * stim[i]['modulationFreq'] * (runTime[i]['stimFrame'] * ifi))
+
+                                elif stim[i]['modulationType'] == 'Chirp':
+                                    runTime[i]['stimulus'].contrast = chirpWave[runTime[i]['stimFrame']]
+                            #
+                            # testTimer = 0
+                            # testTimer = core.Clock()
+                            runTime[i]['stimulus'].draw() #draws every frame
+                            # print(testTimer.getTime())
+
+                            if stim[i]['gratingType'] == 'Plaid':
+                                ortho.draw()
+
+                            #draw the mask if it is defined
+                            for index,_ in maskDict.iteritems():
+                                mask[index].draw()
+                            #     mask[i].draw()
+
+                            #increase stimFrame count if the code has reached here
+                            runTime[i]['stimFrame'] = runTime[i]['stimFrame'] + 1
+
+                        #Flip the window every loop no matter what
+                        win.flip()
+
+
+                        frameCount = frameCount + 1
+
+                    #flip sync spot back to dark before next sweeep
+                    self.drawSyncSpot(syncSpot,-1)
                     win.flip()
 
-                    frameCount = frameCount + 1
+                    #Wait for trial time to expire before starting next sweep
+                    while totalTimer.getTime() < trialTime:
+                        #flip the sync spot at the end of the sweep
+                        self.drawSyncSpot(syncSpot,-1)
+                        win.flip()
 
-                #flip sync spot back to dark before next sweeep
-                self.drawSyncSpot(-1)
+                #Flip the window to background again
+                self.drawSyncSpot(syncSpot,-1)
                 win.flip()
-
-                #Wait for trial time to expire before starting next sweep
-                while totalTimer.getTime() < trialTime:
-                    #flip the sync spot at the end of the sweep
-                    self.drawSyncSpot(-1)
-                    win.flip()
-
-            #Flip the window to background again
-            self.drawSyncSpot(-1)
-            win.flip()
 
     #Defines the stimulus textures
     def defineStimulus(self,runTime,ppm,xOffset,yOffset,i,ifi):
@@ -1658,8 +1728,8 @@ class App(QMainWindow):
         secondIntensity = runTime[i]['secondIntensity']
         bgnd = self.getBackground()
 
-        w = win.size[0]/2
-        h = win.size[1]/2
+        # w = win.size[0]/2
+        # h = win.size[1]/2
 
         #polar coordinates or cartesian coordinates?
         if stim[i]['coordinateType'] == 'Cartesian':
@@ -1680,19 +1750,19 @@ class App(QMainWindow):
         if stim[i]['objectType'] == 'Circle':
 
             #test draw frames to back buffer and save to an array
-            stimArray = self.getStimulusArray(ppm,i,xOffset,yOffset,xPos,yPos,firstIntensity)
-            return
-            #
-            # stimulus = visual.Circle(
-            # win = win,
-            # units = 'pix',
-            # radius = stim[i]['diameter']*ppm/2,
-            # fillColor = [1,1,1],
-            # lineColor = [1,1,1],
-            # contrast = firstIntensity,
-            # edges = 100,
-            # pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
-            # )
+            # stimArray = self.getStimulusArray(ppm,i,xOffset,yOffset,xPos,yPos,firstIntensity)
+            # return
+
+            stimulus = visual.Circle(
+            win = win,
+            units = 'pix',
+            radius = stim[i]['diameter']*ppm/2,
+            fillColor = [1,1,1],
+            lineColor = [1,1,1],
+            contrast = firstIntensity,
+            edges = 100,
+            pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
+            )
 
 
         elif stim[i]['objectType'] == 'Rectangle':
@@ -1954,7 +2024,16 @@ class App(QMainWindow):
         return stimulus
 
     def getStimulusArray(self,ppm,i,xOffset,yOffset,xPos,yPos,firstIntensity):
+        global positions
+
         #original stimulus definition
+        x = runTime[i]['startX']
+        y = runTime[i]['startY']
+
+        #dimensions of the window
+        w = win.size[0] / 2. #retina display
+        h = win.size[1] / 2. #retina display
+
         stimulus = visual.Circle(
         win = win,
         units = 'pix',
@@ -1963,30 +2042,33 @@ class App(QMainWindow):
         lineColor = [1,1,1],
         contrast = firstIntensity,
         edges = 100,
-        pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
+        pos = (x,y)
         )
 
         frames = int(round(stim[i]['duration']/ifi))
 
         stimulus.draw()
-        theStimFrame = visual.BufferImageStim(win,buffer='back',stim=[stimulus])
-        w = int(theStimFrame.size[0])
-        h = int(theStimFrame.size[1])
+        #theStimFrame = visual.BufferImageStim(win,buffer='back',stim=[stimulus])
 
-
-        stimArray = np.zeros((w,h))
+        #dict that will hold the image buffers
+        stimArray = visual.BufferImageStim(win,buffer='back',stim=[stimulus])
+        positions = {}
 
         for frame in range(frames):
             #draw the frame to the back buffer
-            stimulus.draw()
-            #save to the next frame in the array
-            theStimFrame = visual.BufferImageStim(win,buffer='back',stim=[stimulus])
-            theStimFrameArray = np.array(theStimFrame.image)
-            stimArray = np.vstack((stimArray,theStimFrameArray))
+            #stimulus.draw()
 
-            x = runTime[i]['startX'] + ppm * stim[i]['speed'] * (frame * ifi) * np.cos(stim[i]['angle'] * np.pi/180)
-            y = runTime[i]['startY'] + ppm * stim[i]['speed'] * (frame * ifi) * np.sin(stim[i]['angle'] * np.pi/180)
-            stimulus.pos = (x,y)
+            #save to the next frame in the array
+            # testTimer = 0.
+            # testTimer = core.Clock()
+            #
+            # print(testTimer.getTime())
+
+            positions[frame] = {
+            'x':runTime[i]['startX'] + ppm * stim[i]['speed'] * (frame * ifi) * np.cos(stim[i]['angle'] * np.pi/180),
+            'y':runTime[i]['startY'] + ppm * stim[i]['speed'] * (frame * ifi) * np.sin(stim[i]['angle'] * np.pi/180)
+            }
+            #positions[frame][x] = (x,y)
 
         return stimArray
 
@@ -2092,7 +2174,7 @@ class App(QMainWindow):
 
         #temporal frequency chirp
         segment = np.zeros(frames)
-        segment[:] = [contrast * math.sin(4.0 * 2 * math.pi * 0.5 * ((TF_high * x/frames) + TF_low) * x/frames) for x in np.arange(0,frames,1)]
+        segment[:] = [contrast * np.sin(4.0 * 2 * np.pi * 0.5 * ((TF_high * x/frames) + TF_low) * x/frames) for x in np.arange(0,frames,1)]
         chirpWave = np.append(chirpWave,segment)
 
         #1 second pause in between temporal frequency and contrast chirps
@@ -2101,7 +2183,7 @@ class App(QMainWindow):
 
         #contrast chirp
         segment = np.zeros(frames)
-        segment[:] = [contrast * x/frames * math.sin(4.0 * 2 * math.pi * TF_mid * x/frames) for x in np.arange(0,frames,1)]
+        segment[:] = [contrast * x/frames * np.sin(4.0 * 2 * np.pi * TF_mid * x/frames) for x in np.arange(0,frames,1)]
         chirpWave = np.append(chirpWave,segment)
 
         #final flash back to dark
@@ -2283,7 +2365,7 @@ class App(QMainWindow):
         'cloudOrient':0,
         'cloudOrientBand':0,
         'imagePath':'',
-        'batchStimList':'',
+        'batchStimList':[],
         'trajectory':'None',
         'delay':float(self.delay.text()),
         'duration':float(self.duration.text()),
@@ -4638,17 +4720,13 @@ class App(QMainWindow):
         else:
             self.stimBank.setCurrentRow(0)
 
-    #loads stimulus data into variables
-    def loadStimulus(self):
+    #loads named stimulus into the stimulus dictionaries, without actually changing the control displays
+    def fetchStimDict(self,stimName):
 
         global seqAssign,seqDict,stim
         global objectList,seqList,trajList,trajDict,maskDict
 
-        #which stimulus is selected
-        stimulus = self.stimBank.currentItem()
-        index = self.stimBank.currentRow()
-
-        stimName = stimulus.text()
+        #path to selected stimulus
         fileName = stimName + '.stim'
         subfolder = self.subFolder.currentText()
         path = stimPath + subfolder + '/' + fileName
@@ -4665,15 +4743,104 @@ class App(QMainWindow):
             trajStr = dictList[7]
             # maskStr = dictList[9]
 
-            stim = json.loads(stimStr)
+            #stim = json.loads(stimStr)
+
+            stimLoaded = json.loads(stimStr)
             seqDict = json.loads(seqStr)
-            seqAssign = json.loads(assignmentStr)
+            seqAssignLoaded = json.loads(assignmentStr)
             trajDict = json.loads(trajStr)
             # maskDict = json.loads(maskStr)
 
             #convert the string keys to integers
-            stim = {int(k):v for k,v in stim.items()}
-            seqAssign = {int(k):v for k,v in seqAssign.items()}
+            stimLoaded = {int(k):v for k,v in stimLoaded.items()}
+            seqAssignLoaded = {int(k):v for k,v in seqAssignLoaded.items()}
+
+            #reinitialize a fresh stim dict with all of the keys
+            stim = {}
+
+            objectList = []
+            numObjects = len(stimLoaded) #total number of loaded objects
+            for i in range(numObjects):
+                objectList.append((stimLoaded[i]['objectType'])) #fill out the object list so addStimDict will work correctly
+                self.addStimDict()
+
+            #assign the loaded stim dict into the actual stim dict
+            #this allows for the loaded stim to have an incomplete stim dictionary, if new controls have been added
+            for object,_ in stimLoaded.iteritems():
+                for key,value in stimLoaded[object].iteritems():
+                    stim[object][key] = value   #some need to be float though
+
+            for object,_ in seqAssignLoaded.iteritems():
+                for key,value in seqAssignLoaded[object].iteritems():
+                    seqAssign[object][key]['control'] = seqAssignLoaded[object][key]['control']
+                    seqAssign[object][key]['parent'] = seqAssignLoaded[object][key]['parent']
+                    seqAssign[object][key]['sequence'] = seqAssignLoaded[object][key]['sequence']
+
+            #convert string controls to object controls
+            for object,_ in seqAssign.iteritems():
+                for controlName,_ in seqAssign[object].iteritems():
+                    seqAssign[object][controlName]['control'] = control[controlName]
+
+    #loads stimulus data into variables
+    def loadStimulus(self,stimName=''):
+
+        global seqAssign,seqDict,stim,trajDict,maskDict
+        global objectList,seqList,trajList
+
+        #which stimulus is selected
+        if stimName == '':
+            stimulus = self.stimBank.currentItem()
+            index = self.stimBank.currentRow()
+            stimName = stimulus.text()
+
+        fileName = stimName + '.stim'
+        subfolder = self.subFolder.currentText()
+        path = stimPath + subfolder + '/' + fileName
+
+        #open and read stimulus file to dictionaries
+        with open(path,'r') as file:
+            fileStr = file.read()
+
+            #split up the file into its components
+            dictList = fileStr.split('|')
+            stimStr = dictList[1]
+            seqStr = dictList[3]
+            assignmentStr = dictList[5]
+            trajStr = dictList[7]
+            # maskStr = dictList[9]
+
+            #stim = json.loads(stimStr)
+
+            stimLoaded = json.loads(stimStr)
+            seqDict = json.loads(seqStr)
+            seqAssignLoaded = json.loads(assignmentStr)
+            trajDict = json.loads(trajStr)
+
+            #convert the string keys to integers
+            stimLoaded = {int(k):v for k,v in stimLoaded.items()}
+            seqAssignLoaded = {int(k):v for k,v in seqAssignLoaded.items()}
+
+            #reinitialize a fresh stim dict with all of the keys
+            stim = {}
+
+            objectList = []
+            numObjects = len(stimLoaded) #total number of loaded objects
+            for i in range(numObjects):
+                objectList.append((stimLoaded[i]['objectType'])) #fill out the object list so addStimDict will work correctly
+                self.addStimDict()
+
+            #assign the loaded stim/seqAssign dict into the actual stim/seqAssign dict
+            #this allows for the loaded stim to have an incomplete stim dictionary, if new controls have been added
+            for object,_ in stimLoaded.iteritems():
+                for key,value in stimLoaded[object].iteritems():
+                    stim[object][key] = value
+
+            for object,_ in seqAssignLoaded.iteritems():
+                for key,value in seqAssignLoaded[object].iteritems():
+                    seqAssign[object][key]['control'] = seqAssignLoaded[object][key]['control']
+                    seqAssign[object][key]['parent'] = seqAssignLoaded[object][key]['parent']
+                    seqAssign[object][key]['sequence'] = seqAssignLoaded[object][key]['sequence']
+
 
             #convert string controls to object controls
             for object,_ in seqAssign.iteritems():
@@ -4722,10 +4889,10 @@ class App(QMainWindow):
             self.trajectory.addItems(trajList)
 
             #clear object list and repopulate with loaded objects
-            objectList = []
-            numObjects = len(stim)
-            for i in range(numObjects):
-                objectList.append((stim[i]['objectType']))
+            # objectList = []
+            # numObjects = len(stim)
+            # for i in range(numObjects):
+            #     objectList.append((stim[i]['objectType']))
 
             #populate the controls for the first object
             self.objectListBox.clear()
