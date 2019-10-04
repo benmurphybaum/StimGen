@@ -1,8 +1,5 @@
 #StimGen python
 
-#Must use python 2.7, not 3
-#pygame, pyglet, and psychopy
-
 #import widgets
 from PyQt5.QtWidgets import QApplication,QWidget,QMainWindow,QPushButton,QLineEdit,QGroupBox,QComboBox,QFrame,QAbstractItemView,QDesktopWidget
 from PyQt5.QtWidgets import QLabel,QListWidget,QListWidgetItem,QSpacerItem,QVBoxLayout,QGridLayout,QCheckBox,QInputDialog,QListView,QFontDialog
@@ -21,7 +18,7 @@ from time import sleep
 
 #for browsing file explorer
 import tkinter
-from tkinter import filedialog,Tk
+from tkinter import filedialog, Tk
 
 #triggers
 import nidaqmx as ni
@@ -36,7 +33,7 @@ import csv
 import copy
 
 #PsychoPy
-from psychopy import visual, clock, core, monitors#, parallel
+from psychopy import visual, core
 
 import platform
 
@@ -491,22 +488,22 @@ class App(QMainWindow):
             writer = csv.writer(file)
             writer.writerow(['***' + stimName + ':' + self.stimID.text()]) #Stimulus Name ***Stimulus:stimID
 
-            for object,_ in stim.iteritems():
+            for object,_ in stim.items():
                 writer.writerow(['ObjectNum:' + str(object)]) #write object number
 
-                for key,value in stim[object].iteritems():
+                for key,value in stim[object].items():
                     writer.writerow([key + ':' + str(value)])    #write stimulus parameters
 
                 writer.writerow([]) #blank spacer row
 
             writer.writerow(['Sequences:']) #Sequences
-            for key,value in seqDict.iteritems():
+            for key,value in seqDict.items():
                 writer.writerow([key + ':' + str(value)]) #write sequence definitions
 
             writer.writerow(['Trajectories:']) #Trajectories
-            for traj,_ in trajDict.iteritems():
+            for traj,_ in trajDict.items():
                 writer.writerow([traj + '|']) #write trajectory name
-                for key,value in trajDict[traj].iteritems():
+                for key,value in trajDict[traj].items():
                     writer.writerow([key + ':' + str(value)]) #write trajectory definitions
 
             writer.writerow([]) #blank spacer row at end
@@ -777,7 +774,7 @@ class App(QMainWindow):
         self.seqListBox.setSelectionMode(1)
 
         #update all of the sequence menus
-        for key,_ in seqAssign[0].iteritems():
+        for key,_ in seqAssign[0].items():
             control[key].addItem(name)
 
     #Deletes the selected sequence
@@ -803,8 +800,8 @@ class App(QMainWindow):
         del seqList[index+1]
 
         #update sequence assignment menus
-        for object,_ in seqAssign.iteritems():
-            for key,_ in seqAssign[object].iteritems():
+        for object,_ in seqAssign.items():
+            for key,_ in seqAssign[object].items():
                 seqMenu = seqAssign[object][key]['control']
                 seqMenu.removeItem(index + 1) #add one to avoid deleting 'None'
 
@@ -967,7 +964,7 @@ class App(QMainWindow):
         if index == -1:
             return
 
-        for key,val in stim[index].iteritems():
+        for key,val in stim[index].items():
 
             #handle by control type
             type = control[key].__class__.__name__
@@ -975,6 +972,7 @@ class App(QMainWindow):
                 control[key].setText(str(val))
 
             elif type == 'QComboBox':
+
                  #which index has the text
                 items = [control[key].itemText(i) for i in range(control[key].count())]
                 if val == '':
@@ -993,7 +991,7 @@ class App(QMainWindow):
         self.batchStimList.setCurrentRow(0)
 
         #check sequence assignments
-        for key,_ in seqAssign[index].iteritems():
+        for key,_ in seqAssign[index].items():
             sequence = seqAssign[index][key]['sequence']
             if sequence == 'None':
                 #set menu to none if there is no sequence assignment
@@ -1012,7 +1010,7 @@ class App(QMainWindow):
     def displaySeqAssignments(self,objectNum):
         seqDisplay = []
 
-        for key,_ in seqAssign[objectNum].iteritems():
+        for key,_ in seqAssign[objectNum].items():
             sequence = seqAssign[objectNum][key]['sequence']
             if sequence != 'None':
                 seqDisplay.append('[' + str(objectNum) + '] ' + seqAssign[objectNum][key]['parent'] + ': ')
@@ -1031,7 +1029,7 @@ class App(QMainWindow):
             self.designPanelLayout.addWidget(self.angleLabel,9,8)
             self.designPanelLayout.addWidget(self.angle,9,9)
             self.designPanelLayout.addWidget(self.angleSeq,9,10)
-            for key,value in circleSettings.iteritems():
+            for key,value in circleSettings.items():
                 if value == 0:
                     control[key].hide()
                 else:
@@ -1046,7 +1044,7 @@ class App(QMainWindow):
             self.designPanelLayout.addWidget(self.angleLabel,9,8)
             self.designPanelLayout.addWidget(self.angle,9,9)
             self.designPanelLayout.addWidget(self.angleSeq,9,10)
-            for key,value in rectangleSettings.iteritems():
+            for key,value in rectangleSettings.items():
                 if value == 0:
                     control[key].hide()
                 else:
@@ -1064,7 +1062,7 @@ class App(QMainWindow):
             self.designPanelLayout.addWidget(self.driftFreqLabel,7,8)
             self.designPanelLayout.addWidget(self.driftFreq,7,9)
             self.designPanelLayout.addWidget(self.driftFreqSeq,7,10)
-            for key,value in gratingSettings.iteritems():
+            for key,value in gratingSettings.items():
                 if value == 0:
                     control[key].hide()
                 else:
@@ -1078,7 +1076,7 @@ class App(QMainWindow):
             self.designPanelLayout.addWidget(self.angleLabel,9,8)
             self.designPanelLayout.addWidget(self.angle,9,9)
             self.designPanelLayout.addWidget(self.angleSeq,9,10)
-            for key,value in noiseSettings.iteritems():
+            for key,value in noiseSettings.items():
                 if value == 0:
                     control[key].hide()
                 else:
@@ -1091,7 +1089,7 @@ class App(QMainWindow):
             self.designPanelLayout.addWidget(self.angleLabel,9,8)
             self.designPanelLayout.addWidget(self.angle,9,9)
             self.designPanelLayout.addWidget(self.angleSeq,9,10)
-            for key,value in cloudSettings.iteritems():
+            for key,value in cloudSettings.items():
                 if value == 0:
                     control[key].hide()
                 else:
@@ -1107,7 +1105,7 @@ class App(QMainWindow):
             self.designPanelLayout.addWidget(self.driftFreqLabel,8,8)
             self.designPanelLayout.addWidget(self.driftFreq,8,9)
             self.designPanelLayout.addWidget(self.driftFreqSeq,8,10)
-            for key,value in windmillSettings.iteritems():
+            for key,value in windmillSettings.items():
                 if value == 0:
                     control[key].hide()
                 else:
@@ -1116,7 +1114,7 @@ class App(QMainWindow):
             self.flipControls('motionType',self.motionType.currentText())
 
         elif selection == 'Annulus':
-            for key,value in annulusSettings.iteritems():
+            for key,value in annulusSettings.items():
                 if value == 0:
                     control[key].hide()
                 else:
@@ -1128,7 +1126,7 @@ class App(QMainWindow):
             self.designPanelLayout.addWidget(self.angleLabel,9,8)
             self.designPanelLayout.addWidget(self.angle,9,9)
             self.designPanelLayout.addWidget(self.angleSeq,9,10)
-            for key,value in imageSettings.iteritems():
+            for key,value in imageSettings.items():
                 if value == 0:
                     control[key].hide()
                 else:
@@ -1141,9 +1139,10 @@ class App(QMainWindow):
             self.batchStimMenu.clear()
             stimList = self.getStimulusBank()
             self.batchStimMenu.addItems(stimList)
+
             self.stimBank.setCurrentRow(index)
 
-            for key,value in batchSettings.iteritems():
+            for key,value in batchSettings.items():
                 if value == 0:
                     control[key].hide()
                 else:
@@ -1154,7 +1153,7 @@ class App(QMainWindow):
             self.designPanelLayout.addWidget(self.angleLabel,9,8)
             self.designPanelLayout.addWidget(self.angle,9,9)
             self.designPanelLayout.addWidget(self.angleSeq,9,10)
-            for key,value in snakeSettings.iteritems():
+            for key,value in snakeSettings.items():
                 if value == 0:
                     control[key].hide()
                 else:
@@ -1163,7 +1162,7 @@ class App(QMainWindow):
 
         elif selection == 'Static' and controlName == 'motionType':
             #self.designPanelLayout.addWidget(self.blank5,7,8,4,1)
-            for key,value in staticMotionSettings.iteritems():
+            for key,value in staticMotionSettings.items():
                 if value == 0:
                     control[key].hide()
                 else:
@@ -1173,57 +1172,57 @@ class App(QMainWindow):
             #self.designPanelLayout.addWidget(self.blank5,10,8,1,1)
             #Grating and windmill have different options for motion than other stimuli
             if self.objectType.currentText() == 'Grating':
-                for key,value in driftGratingMotionSettings.iteritems():
+                for key,value in driftGratingMotionSettings.items():
                     if value == 0:
                         control[key].hide()
                     else:
                         control[key].show()
             elif self.objectType.currentText() == 'Windmill':
-                for key,value in windmillMotionSettings.iteritems():
+                for key,value in windmillMotionSettings.items():
                     if value == 0:
                         control[key].hide()
                     else:
                         control[key].show()
             else:
-                for key,value in driftMotionSettings.iteritems():
+                for key,value in driftMotionSettings.items():
                     if value == 0:
                         control[key].hide()
                     else:
                         control[key].show()
 
         elif selection == 'Static' and controlName == 'modulationType':
-            for key,value in staticModSettings.iteritems():
+            for key,value in staticModSettings.items():
                 if value == 0:
                     control[key].hide()
                 else:
                     control[key].show()
 
         elif selection != 'Static' and controlName == 'modulationType':
-            for key,value in dynamicModSettings.iteritems():
+            for key,value in dynamicModSettings.items():
                 if value == 0:
                     control[key].hide()
                 else:
                     control[key].show()
         elif selection == 'Cartesian' and controlName == 'coordinateType':
-            for key,value in cartesianSettings.iteritems():
+            for key,value in cartesianSettings.items():
                 if value == 0:
                     control[key].hide()
                 else:
                     control[key].show()
         elif selection == 'Cartesian' and controlName == 'maskCoordinateType':
-            for key,value in cartesianMaskSettings.iteritems():
+            for key,value in cartesianMaskSettings.items():
                 if value == 0:
                     control[key].hide()
                 else:
                     control[key].show()
         elif selection == 'Polar' and controlName == 'coordinateType':
-            for key,value in polarSettings.iteritems():
+            for key,value in polarSettings.items():
                 if value == 0:
                     control[key].hide()
                 else:
                     control[key].show()
         elif selection == 'Polar' and controlName == 'maskCoordinateType':
-            for key,value in polarMaskSettings.iteritems():
+            for key,value in polarMaskSettings.items():
                 if value == 0:
                     control[key].hide()
                 else:
@@ -1410,7 +1409,7 @@ class App(QMainWindow):
 
             #check for sequence assignments to get the total number of sweeps
             for i in range(numObjects):
-                for key,_ in seqAssign[i].iteritems():
+                for key,_ in seqAssign[i].items():
                     sequence = seqAssign[i][key]['sequence']
                     if sequence != 'None':
                         #extract sequence entry
@@ -1472,7 +1471,7 @@ class App(QMainWindow):
 
                     #check for sequence assignments and fill runtime dictionary
                     for i in range(numObjects):
-                        for key,_ in seqAssign[i].iteritems():
+                        for key,_ in seqAssign[i].items():
                             sequence = seqAssign[i][key]['sequence']
                             if sequence != 'None':
                                 #extract sequence entry
@@ -1702,7 +1701,7 @@ class App(QMainWindow):
                                 ortho.draw()
 
                             #draw the mask if it is defined
-                            for index,_ in maskDict.iteritems():
+                            for index,_ in maskDict.items():
                                 mask[index].draw()
                             #     mask[i].draw()
 
@@ -2017,7 +2016,7 @@ class App(QMainWindow):
             print('other')
 
         mask = {}
-        for i,_ in maskDict.iteritems():
+        for i,_ in maskDict.items():
             if maskDict[i]['maskType'] == 'Circle':
                 mask[i] = visual.Circle(
                 win = win,
@@ -4644,8 +4643,8 @@ class App(QMainWindow):
         seqAssignTemp = copy.deepcopy(seqAssign)
 
         #can't save control references using json, so eliminating those in the saved file
-        for object,_ in seqAssignTemp.iteritems():
-            for item,_ in seqAssignTemp[object].iteritems():
+        for object,_ in seqAssignTemp.items():
+            for item,_ in seqAssignTemp[object].items():
                 seqAssignTemp[object][item]['control'] = 0
 
         stimulus = json.dumps(stim)
@@ -4779,19 +4778,19 @@ class App(QMainWindow):
 
             #assign the loaded stim dict into the actual stim dict
             #this allows for the loaded stim to have an incomplete stim dictionary, if new controls have been added
-            for object,_ in stimLoaded.iteritems():
-                for key,value in stimLoaded[object].iteritems():
+            for object,_ in stimLoaded.items():
+                for key,value in stimLoaded[object].items():
                     stim[object][key] = value   #some need to be float though
 
-            for object,_ in seqAssignLoaded.iteritems():
-                for key,value in seqAssignLoaded[object].iteritems():
+            for object,_ in seqAssignLoaded.items():
+                for key,value in seqAssignLoaded[object].items():
                     seqAssign[object][key]['control'] = seqAssignLoaded[object][key]['control']
                     seqAssign[object][key]['parent'] = seqAssignLoaded[object][key]['parent']
                     seqAssign[object][key]['sequence'] = seqAssignLoaded[object][key]['sequence']
 
             #convert string controls to object controls
-            for object,_ in seqAssign.iteritems():
-                for controlName,_ in seqAssign[object].iteritems():
+            for object,_ in seqAssign.items():
+                for controlName,_ in seqAssign[object].items():
                     seqAssign[object][controlName]['control'] = control[controlName]
 
     #loads stimulus data into variables
@@ -4844,20 +4843,20 @@ class App(QMainWindow):
 
             #assign the loaded stim/seqAssign dict into the actual stim/seqAssign dict
             #this allows for the loaded stim to have an incomplete stim dictionary, if new controls have been added
-            for object,_ in stimLoaded.iteritems():
-                for key,value in stimLoaded[object].iteritems():
+            for object,_ in stimLoaded.items():
+                for key,value in stimLoaded[object].items():
                     stim[object][key] = value
 
-            for object,_ in seqAssignLoaded.iteritems():
-                for key,value in seqAssignLoaded[object].iteritems():
+            for object,_ in seqAssignLoaded.items():
+                for key,value in seqAssignLoaded[object].items():
                     seqAssign[object][key]['control'] = seqAssignLoaded[object][key]['control']
                     seqAssign[object][key]['parent'] = seqAssignLoaded[object][key]['parent']
                     seqAssign[object][key]['sequence'] = seqAssignLoaded[object][key]['sequence']
 
 
             #convert string controls to object controls
-            for object,_ in seqAssign.iteritems():
-                for controlName,_ in seqAssign[object].iteritems():
+            for object,_ in seqAssign.items():
+                for controlName,_ in seqAssign[object].items():
                     seqAssign[object][controlName]['control'] = control[controlName]
 
             #repopulate seqList and add sequences to the sequence list box
@@ -4876,7 +4875,7 @@ class App(QMainWindow):
                 self.seqEntry.setText('')
 
             #update all of the sequence menus
-            for key,_ in seqAssign[0].iteritems():
+            for key,_ in seqAssign[0].items():
                 control[key].clear() #first reset sequence menus
                 control[key].addItems(seqList)
 
@@ -4919,6 +4918,7 @@ class App(QMainWindow):
 
             #display sequence assignment message
             self.displaySeqAssignments(0)
+
 
     #find all the stimulus files in the selected subfolder
     def getStimulusBank(self):
@@ -5048,11 +5048,11 @@ class App(QMainWindow):
 #Start the application
 if __name__ == '__main__':
 
-    #create instance of application
-    StimGen = QApplication([])
 
     #scaling will transfer to lower res monitors
-    StimGen.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True)
+    QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True)
+    #create instance of application
+    StimGen = QApplication([])
 
     #styles
     StimGen.setStyle('Fusion')
@@ -5068,10 +5068,5 @@ if __name__ == '__main__':
 
     StimGen.setFont(myFont)
 
-    #self.window().devicePixelRatioF()
-
-
-   # StimGen.setStyleSheet("QPushButton {border-radius: 20px;}")
-    #StimGen.setStyleSheet("QPushButton {background-color: blue;}")
     ex = App()
     StimGen.exec_()
