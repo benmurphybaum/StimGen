@@ -294,9 +294,9 @@ class App(QMainWindow):
             if self.isFloat(entry):
                 stim[index][controlName] = float(entry)   #some need to be float though
             else:
-                if entry.isnumeric():
+                try:
                     stim[index][controlName] = int(entry)
-                else:
+                except:
                     control[controlName].setText('0')
                     stim[index][controlName] = 0
 
