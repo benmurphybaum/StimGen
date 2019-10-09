@@ -1637,14 +1637,32 @@ class App(QMainWindow):
                                     runTime[i]['cycleCount'] = runTime[i]['cycleCount'] + 1 #counts which modulation cycle it's on
 
                             elif stim[i]['objectType'] == 'Snake':
-                                xdist = ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.cos(stim[i]['angle'] * np.pi/180)
-                                ydist = ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.sin(stim[i]['angle'] * np.pi/180)
+                                if stim[i]['trajectory'] == 'None':
+                                    xdist = ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.cos(stim[i]['angle'] * np.pi/180)
+                                    ydist = ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.sin(stim[i]['angle'] * np.pi/180)
 
-                                x = runTime[i]['startX'] + xdist/2.
-                                y = runTime[i]['startY'] + ydist/2.
+                                    x = runTime[i]['startX'] + xdist/2.
+                                    y = runTime[i]['startY'] + ydist/2.
 
-                                runTime[i]['stimulus'].pos = (x,y)
-                                runTime[i]['stimulus'].width = ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi)
+                                    runTime[i]['stimulus'].pos = (x,y)
+                                    runTime[i]['stimulus'].width = ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi)
+
+                                else:
+                                    #which segment are we on?
+                                    for x in range(snakeStim[i]['numSegments'],0,-1): #count down
+                                        if runTime[i]['stimFrame'] >= snakeStim[i]['startFrame'][x-1]:
+                                            currentSegment = x-1
+                                            break
+                                        else:
+                                            currentSegment = 0
+
+                                    snakeStim[i]['segments'][currentSegment].pos = self.getTrajectoryPosition(i,ifi,ppm)
+                                    snakeStim[i]['segments'][currentSegment].width = (stim[i]['width'] + stim[i]['speed'] * ((runTime[i]['stimFrame'] - snakeStim[i]['startFrame'][currentSegment]) * ifi)) * ppm
+                                    # runTime[i]['stimulus'].pos = (x,y)
+
+
+                                    #runTime[i]['stimulus'].pos = self.getTrajectoryPosition(i,ifi,ppm)
+
 
                             #ALL OTHER STIMULI
                             else:
@@ -1665,7 +1683,7 @@ class App(QMainWindow):
                                             runTime[i]['stimulus'].setPos((x,y))
 
                                         else:
-                                            runTime[i]['stimulus'].pos = self.getTrajectoryPosition(i)
+                                            runTime[i]['stimulus'].pos = self.getTrajectoryPosition(i,ifi,ppm)
 
                                 #Update intensity for modulated stimuli
 
@@ -1694,7 +1712,14 @@ class App(QMainWindow):
                             #
                             # testTimer = 0
                             # testTimer = core.Clock()
-                            runTime[i]['stimulus'].draw() #draws every frame
+
+
+                            if stim[i]['objectType'] == 'Snake':
+                                for segment in range(currentSegment+1):
+                                    snakeStim[i]['segments'][segment].draw()
+                            else:
+                                runTime[i]['stimulus'].draw() #draws every frame
+
                             # print(testTimer.getTime())
 
                             if stim[i]['gratingType'] == 'Plaid':
@@ -1730,7 +1755,7 @@ class App(QMainWindow):
 
     #Defines the stimulus textures
     def defineStimulus(self,runTime,ppm,xOffset,yOffset,i,ifi):
-        global motionCloud, mask, ortho,stimArray#, innerRing, outerRing
+        global motionCloud, mask, ortho,stimArray,snakeStim#, innerRing, outerRing
 
         firstIntensity = runTime[i]['firstIntensity']
         secondIntensity = runTime[i]['secondIntensity']
@@ -1988,17 +2013,48 @@ class App(QMainWindow):
             else:
                 numSegments = 1
 
-            stimulus = visual.Rect(
-            win = win,
-            units = 'pix',
-            width = stim[i]['width'] * ppm,
-            height = stim[i]['length'] * ppm,
-            ori = -stim[i]['angle'],
-            fillColor = [1,1,1],
-            lineColor = [1,1,1],
-            contrast = firstIntensity,
-            pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
-            )
+            numObjects = len(stim)
+
+            #snake dictionary
+            snakeStim = {}
+            for object in range(numObjects):
+                snakeStim[object] = {
+                'numSegments':0,
+                'segments':{},
+                'startFrame':{}
+                }
+
+            snakeStim[i]['numSegments'] = numSegments
+
+
+            snakeStim[i]['startFrame'][0] = 0
+            totalFrames = 0
+            #Find the starting frames for each segment
+            for x in range(1,numSegments):
+                snakeStim[i]['startFrame'][x] = totalFrames + round(float(trajDict[name]['duration'][x]) / ifi)
+                totalFrames = snakeStim[i]['startFrame'][x]
+
+            for x in range(numSegments):
+
+                # xdist = ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.cos(stim[i]['angle'] * np.pi/180)
+                # ydist = ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.sin(stim[i]['angle'] * np.pi/180)
+                #
+                # x = runTime[i]['startX'] + xdist/2.
+                # y = runTime[i]['startY'] + ydist/2.
+
+                snakeStim[i]['segments'][x] = visual.Rect(
+                    win = win,
+                    units = 'pix',
+                    width = stim[i]['width'] * ppm,
+                    height = stim[i]['length'] * ppm,
+                    ori = -int(trajDict[name]['angle'][x]),
+                    fillColor = [1,1,1],
+                    lineColor = [1,1,1],
+                    contrast = firstIntensity,
+                    pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
+                    )
+            return
+
         elif stim[i]['objectType'] == 'Image':
             subfolder = self.subFolder.currentText()
             imagePath = stimPath + subfolder + '/' + self.imagePath.currentText() + '.bmp'
@@ -2114,6 +2170,7 @@ class App(QMainWindow):
             #calculate which frame each segment will start on
             if segment == 0:
                 numFrames = int(round(float(liveTrajDict[name]['duration'][segment])/ifi)) #frames in the current segment
+                #numFrames = numFrames + (0.5 * stim[i]['width'] / stim[i]['speed']) #add extra frames to account for the center of the starting snake getting to the turn position
                 segmentFrames = np.zeros(numFrames)
 
                 runTime[i]['trajectory']['startFrame'].append(0)
@@ -2122,37 +2179,75 @@ class App(QMainWindow):
                 startX = ppm * (xOffset + stim[i]['xPos']) + ppm * stim[i]['startRad'] * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180.)
                 startY = ppm * (yOffset + stim[i]['yPos']) + ppm * stim[i]['startRad'] * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180.)
 
-                #X position segment
-                segmentFrames[:] = [startX + ppm * stim[i]['speed'] * ifi * t * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
-                trajectoryStim[i]['xPos'] = np.append(trajectoryStim[i]['xPos'],segmentFrames)
+                if stim[i]['objectType'] == 'Snake':
+                    #X position segment - half as much distance traveled because its a growing rectangle that is also changing its length simultaneously
+                    segmentFrames[:] = [startX + 0.5 * ppm * stim[i]['speed'] * ifi * t * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
+                    trajectoryStim[i]['xPos'] = np.append(trajectoryStim[i]['xPos'],segmentFrames)
 
-                #Y position segment
-                segmentFrames[:] = [startY + ppm * stim[i]['speed'] * ifi * t * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
-                trajectoryStim[i]['yPos'] = np.append(trajectoryStim[i]['yPos'],segmentFrames)
+                    #Y position segment
+                    segmentFrames[:] = [startY + 0.5 * ppm * stim[i]['speed'] * ifi * t * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
+                    trajectoryStim[i]['yPos'] = np.append(trajectoryStim[i]['yPos'],segmentFrames)
+                else:
+                    #X position segment
+                    segmentFrames[:] = [startX + ppm * stim[i]['speed'] * ifi * t * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
+                    trajectoryStim[i]['xPos'] = np.append(trajectoryStim[i]['xPos'],segmentFrames)
+
+                    #Y position segment
+                    segmentFrames[:] = [startY + ppm * stim[i]['speed'] * ifi * t * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
+                    trajectoryStim[i]['yPos'] = np.append(trajectoryStim[i]['yPos'],segmentFrames)
+
+
             else:
+                if stim[i]['objectType'] == 'Snake':
+                    numFrames = int(round(float(liveTrajDict[name]['duration'][segment])/ifi)) #frames in the current segment
+                    segmentFrames = np.zeros(numFrames)
 
-                numFrames = int(round(float(liveTrajDict[name]['duration'][segment])/ifi)) #frames in the current segment
-                segmentFrames = np.zeros(numFrames)
+                    size = len(trajectoryStim[i]['xPos'])
+                    prevStartPos = trajectoryStim[i]['xPos'][size-1] + 0.5 * ppm * (numFrames) * stim[i]['speed'] * ifi * np.cos(float(liveTrajDict[name]['angle'][segment-1]) * np.pi/180)
+                    segmentFrames[:] = [prevStartPos + 0.5 * ppm * stim[i]['speed'] * ifi * t * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
+                    trajectoryStim[i]['xPos'] = np.append(trajectoryStim[i]['xPos'],segmentFrames)
 
-                size = len(trajectoryStim[i]['xPos'])
-                prevStartPos = trajectoryStim[i]['xPos'][size-1]
-                segmentFrames[:] = [prevStartPos + ppm * stim[i]['speed'] * ifi * t * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
-                trajectoryStim[i]['xPos'] = np.append(trajectoryStim[i]['xPos'],segmentFrames)
+                    size = len(trajectoryStim[i]['yPos'])
+                    prevStartPos = trajectoryStim[i]['yPos'][size-1]  + 0.5 * ppm * (numFrames) * stim[i]['speed'] * ifi * np.sin(float(liveTrajDict[name]['angle'][segment-1]) * np.pi/180)
+                    segmentFrames[:] = [prevStartPos + 0.5 * ppm * stim[i]['speed'] * ifi * t * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
+                    trajectoryStim[i]['yPos'] = np.append(trajectoryStim[i]['yPos'],segmentFrames)
+                else:
+                    numFrames = int(round(float(liveTrajDict[name]['duration'][segment])/ifi)) #frames in the current segment
+                    segmentFrames = np.zeros(numFrames)
 
-                size = len(trajectoryStim[i]['yPos'])
-                prevStartPos = trajectoryStim[i]['yPos'][size-1]
-                segmentFrames[:] = [prevStartPos + ppm * stim[i]['speed'] * ifi * t * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
-                trajectoryStim[i]['yPos'] = np.append(trajectoryStim[i]['yPos'],segmentFrames)
+                    size = len(trajectoryStim[i]['xPos'])
+                    prevStartPos = trajectoryStim[i]['xPos'][size-1]
+                    segmentFrames[:] = [prevStartPos + ppm * stim[i]['speed'] * ifi * t * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
+                    trajectoryStim[i]['xPos'] = np.append(trajectoryStim[i]['xPos'],segmentFrames)
+
+                    size = len(trajectoryStim[i]['yPos'])
+                    prevStartPos = trajectoryStim[i]['yPos'][size-1]
+                    segmentFrames[:] = [prevStartPos + ppm * stim[i]['speed'] * ifi * t * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
+                    trajectoryStim[i]['yPos'] = np.append(trajectoryStim[i]['yPos'],segmentFrames)
 
     #returns the X/Y position of the object according to its trajectory
-    def getTrajectoryPosition(self,i):
+    def getTrajectoryPosition(self,i,ifi,ppm):
+        if stim[i]['objectType'] == 'Snake':
+            if runTime[i]['stimFrame'] > len(trajectoryStim[i]['xPos']):
+                x = trajectoryStim[i]['xPos'][len(trajectoryStim[i]['xPos'])-1]
+                y = trajectoryStim[i]['yPos'][len(trajectoryStim[i]['xPos'])-1]
+            else:
+                x = trajectoryStim[i]['xPos'][runTime[i]['stimFrame']]
+                y = trajectoryStim[i]['yPos'][runTime[i]['stimFrame']]
 
-        if runTime[i]['stimFrame'] > len(trajectoryStim[i]['xPos']):
-            x = trajectoryStim[i]['xPos'][len(trajectoryStim[i]['xPos'])-1]
-            y = trajectoryStim[i]['yPos'][len(trajectoryStim[i]['xPos'])-1]
+            #xdist = ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.cos(stim[i]['angle'] * np.pi/180)
+            #ydist = ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.sin(stim[i]['angle'] * np.pi/180)
+
+            # x = runTime[i]['startX'] + xdist/2.
+            # y = runTime[i]['startY'] + ydist/2.
         else:
-            x = trajectoryStim[i]['xPos'][runTime[i]['stimFrame']]
-            y = trajectoryStim[i]['yPos'][runTime[i]['stimFrame']]
+            if runTime[i]['stimFrame'] > len(trajectoryStim[i]['xPos']):
+                x = trajectoryStim[i]['xPos'][len(trajectoryStim[i]['xPos'])-1]
+                y = trajectoryStim[i]['yPos'][len(trajectoryStim[i]['xPos'])-1]
+            else:
+                x = trajectoryStim[i]['xPos'][runTime[i]['stimFrame']]
+                y = trajectoryStim[i]['yPos'][runTime[i]['stimFrame']]
+
         return (x,y)
 
     #builds the wave to hold the temporal modulation for a chirp stimulus
@@ -4637,18 +4732,15 @@ class App(QMainWindow):
 
     #save the stimulus to a text file
     def saveStimulus(self):
-        global seqAssign
-
         #convert stimulus/sequence dictionaries into json string
-        seqAssignTemp = copy.deepcopy(seqAssign)
 
         #can't save control references using json, so eliminating those in the saved file
-        for object,_ in seqAssignTemp.items():
-            for item,_ in seqAssignTemp[object].items():
-                seqAssignTemp[object][item]['control'] = 0
+        for object,_ in seqAssign.items():
+            for item,_ in seqAssign[object].items():
+                seqAssign[object][item]['control'] = 0
 
         stimulus = json.dumps(stim)
-        sequence = json.dumps(seqAssignTemp)
+        sequence = json.dumps(seqAssign)
         seqDefs = json.dumps(seqDict)
         trajDefs = json.dumps(trajDict)
         maskDefs = json.dumps(maskDict)
@@ -4658,6 +4750,7 @@ class App(QMainWindow):
         #stimName = stimulus.text() #current selection is default name
 
         name, ok = QInputDialog.getText(self, 'Save Stimulus','Stimulus Name:')#,QLineEdit.Normal,stimName)
+
         if name == '':
             return
 
@@ -4918,7 +5011,6 @@ class App(QMainWindow):
 
             #display sequence assignment message
             self.displaySeqAssignments(0)
-
 
     #find all the stimulus files in the selected subfolder
     def getStimulusBank(self):

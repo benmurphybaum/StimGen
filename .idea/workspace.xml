@@ -2,10 +2,9 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="dc25f4d2-104d-4a59-998f-5851b8a79a02" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/StimGen.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/StimGen.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/StimGen.py" beforeDir="false" afterPath="$PROJECT_DIR$/StimGen.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/stimGen_testCode.py" beforeDir="false" afterPath="$PROJECT_DIR$/stimGen_testCode.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/stimuli/Ben/snakeTest.stim" beforeDir="false" afterPath="$PROJECT_DIR$/stimuli/Ben/snakeTest.stim" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -32,8 +31,23 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/StimGen.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="116">
-              <caret line="20" column="25" lean-forward="true" selection-start-line="20" selection-start-column="25" selection-end-line="20" selection-end-column="25" />
+            <state relative-caret-position="230">
+              <caret line="1531" selection-start-line="1531" selection-end-line="1531" />
+              <folding>
+                <element signature="e#33#175#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$APPLICATION_HOME_DIR$/helpers/pydev/pydevd.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="483">
+              <caret line="1138" column="34" selection-start-line="1138" selection-start-column="34" selection-end-line="1138" selection-end-column="34" />
+              <folding>
+                <element signature="e#50128#50221#0" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -46,6 +60,7 @@
       <find>getStimulusArray</find>
       <find>getStimulusARr</find>
       <find>setObjectParameters</find>
+      <find>snakestim</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -71,7 +86,7 @@
     </option>
   </component>
   <component name="ProjectFrameBounds">
-    <option name="x" value="3381" />
+    <option name="x" value="3475" />
     <option name="y" value="23" />
     <option name="width" value="1618" />
     <option name="height" value="1027" />
@@ -118,9 +133,12 @@
       <module name="StimGen" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
-      <option name="SDK_HOME" value="$USER_HOME$/anaconda3/envs/stim/bin/python" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
       <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
-      <option name="IS_MODULE_SDK" value="false" />
+      <option name="IS_MODULE_SDK" value="true" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
@@ -187,22 +205,24 @@
       <workItem from="1570050607908" duration="1540000" />
       <workItem from="1570148584505" duration="2172000" />
       <workItem from="1570210062601" duration="926000" />
+      <workItem from="1570574284208" duration="201000" />
+      <workItem from="1570576336159" duration="1924000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="11866000" />
+    <option name="totallyTimeSpent" value="13991000" />
   </component>
   <component name="ToolWindowManager">
-    <frame x="3381" y="23" width="1618" height="1027" extended-state="0" />
+    <frame x="3475" y="23" width="1618" height="1027" extended-state="0" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.16497461" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.16878173" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" />
       <window_info anchor="bottom" id="Run" order="2" />
-      <window_info anchor="bottom" id="Debug" order="3" weight="0.30984455" />
+      <window_info anchor="bottom" id="Debug" order="3" weight="0.3368984" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="6" />
@@ -211,7 +231,7 @@
       <window_info anchor="bottom" id="Database Changes" order="9" />
       <window_info anchor="bottom" id="Event Log" order="10" side_tool="true" />
       <window_info anchor="bottom" id="Terminal" order="11" weight="0.27564767" />
-      <window_info active="true" anchor="bottom" id="Python Console" order="12" visible="true" weight="0.31229946" />
+      <window_info anchor="bottom" id="Python Console" order="12" weight="0.31229946" />
       <window_info anchor="right" id="Commander" internal_type="SLIDING" order="0" type="SLIDING" weight="0.4" />
       <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
@@ -231,11 +251,16 @@
           <line>6</line>
           <option name="timeStamp" value="30" />
         </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/StimGen.py</url>
+          <line>2027</line>
+          <option name="timeStamp" value="33" />
+        </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/StimGen$StimGen.coverage" NAME="StimGen Coverage Results" MODIFIED="1570210147287" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/StimGen$StimGen.coverage" NAME="StimGen Coverage Results" MODIFIED="1570577269368" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
   <component name="debuggerHistoryManager">
     <expressions id="evaluateExpression">
@@ -285,31 +310,25 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$USER_HOME$/anaconda3/envs/stim/lib/python3.7/site-packages/arabic_reshaper/__init__.py" />
+    <entry file="file://$USER_HOME$/anaconda3/envs/stim/lib/python3.7/site-packages/psychopy/preferences/preferences.py" />
     <entry file="file://$APPLICATION_HOME_DIR$/helpers/pydev/pydevd.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="17130">
-          <caret line="1142" column="22" selection-start-line="1142" selection-start-column="22" selection-end-line="1142" selection-end-column="22" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$USER_HOME$/anaconda3/envs/stim/lib/python3.7/site-packages/arabic_reshaper/__init__.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="45">
-          <caret line="5" selection-start-line="5" selection-end-line="5" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$USER_HOME$/anaconda3/envs/stim/lib/python3.7/site-packages/psychopy/preferences/preferences.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1279">
-          <caret line="140" column="32" lean-forward="true" selection-start-line="140" selection-start-column="32" selection-end-line="140" selection-end-column="32" />
+        <state relative-caret-position="483">
+          <caret line="1138" column="34" selection-start-line="1138" selection-start-column="34" selection-end-line="1138" selection-end-column="34" />
+          <folding>
+            <element signature="e#50128#50221#0" />
+          </folding>
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/StimGen.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="116">
-          <caret line="20" column="25" lean-forward="true" selection-start-line="20" selection-start-column="25" selection-end-line="20" selection-end-column="25" />
+        <state relative-caret-position="230">
+          <caret line="1531" selection-start-line="1531" selection-end-line="1531" />
+          <folding>
+            <element signature="e#33#175#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
