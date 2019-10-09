@@ -1526,7 +1526,7 @@ class App(QMainWindow):
                         runTime[i]['secondIntensity'] = secondIntensity
 
                         #Define stimulus
-                        runTime[i]['stimulus'] = self.defineStimulus(runTime,ppm,xOffset,yOffset,i,ifi)
+                        runTime[i]['stimulus'] = self.defineStimulus(runTime,ppm,xOffset,yOffset,i,ifi,sweep)
 
                         #reset stimulus frame counts
                         runTime[i]['stimFrame'] = 0
@@ -1754,7 +1754,7 @@ class App(QMainWindow):
                 win.flip()
 
     #Defines the stimulus textures
-    def defineStimulus(self,runTime,ppm,xOffset,yOffset,i,ifi):
+    def defineStimulus(self,runTime,ppm,xOffset,yOffset,i,ifi,sweep):
         global motionCloud, mask, ortho,stimArray,snakeStim#, innerRing, outerRing
 
         firstIntensity = runTime[i]['firstIntensity']
@@ -2041,13 +2041,22 @@ class App(QMainWindow):
                 #
                 # x = runTime[i]['startX'] + xdist/2.
                 # y = runTime[i]['startY'] + ydist/2.
+                angle = trajDict[name]['angle'][x]
+                if angle.isnumeric():
+                    orientation = angle
+                    continue
+                elif str(trajDict[name]['angle'][x]) in seqList:
+                    #is the entry a sequence?
+                    #If so, replace the trajectory segment with the sequence entry for the current sweep
+                    theSequence = str(trajDict[name]['angle'][x])
+                    orientation = seqDict[theSequence][sweep]
 
                 snakeStim[i]['segments'][x] = visual.Rect(
                     win = win,
                     units = 'pix',
                     width = stim[i]['width'] * ppm,
                     height = stim[i]['length'] * ppm,
-                    ori = -int(trajDict[name]['angle'][x]),
+                    ori = -int(orientation),
                     fillColor = [1,1,1],
                     lineColor = [1,1,1],
                     contrast = firstIntensity,
