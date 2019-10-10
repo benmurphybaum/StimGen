@@ -577,7 +577,9 @@ class App(QMainWindow):
             subfolder = selection
             #get the stimulus files
             self.getStimulusBank()
-
+            if self.stimBank.count() > 0:
+                self.stimBank.setCurrentRow(0)
+                self.loadStimulus()
         else:
             #add parameter to stim dictionary for all other drop down menus (motionType,coordinateType, etc...)
             stim[index][controlName] = selection
@@ -2096,55 +2098,6 @@ class App(QMainWindow):
 
         return stimulus
 
-    def getStimulusArray(self,ppm,i,xOffset,yOffset,xPos,yPos,firstIntensity):
-        global positions
-
-        #original stimulus definition
-        x = runTime[i]['startX']
-        y = runTime[i]['startY']
-
-        #dimensions of the window
-        w = win.size[0] / 2. #retina display
-        h = win.size[1] / 2. #retina display
-
-        stimulus = visual.Circle(
-        win = win,
-        units = 'pix',
-        radius = stim[i]['diameter']*ppm/2,
-        fillColor = [1,1,1],
-        lineColor = [1,1,1],
-        contrast = firstIntensity,
-        edges = 100,
-        pos = (x,y)
-        )
-
-        frames = int(round(stim[i]['duration']/ifi))
-
-        stimulus.draw()
-        #theStimFrame = visual.BufferImageStim(win,buffer='back',stim=[stimulus])
-
-        #dict that will hold the image buffers
-        stimArray = visual.BufferImageStim(win,buffer='back',stim=[stimulus])
-        positions = {}
-
-        for frame in range(frames):
-            #draw the frame to the back buffer
-            #stimulus.draw()
-
-            #save to the next frame in the array
-            # testTimer = 0.
-            # testTimer = core.Clock()
-            #
-            # print(testTimer.getTime())
-
-            positions[frame] = {
-            'x':runTime[i]['startX'] + ppm * stim[i]['speed'] * (frame * ifi) * np.cos(stim[i]['angle'] * np.pi/180),
-            'y':runTime[i]['startY'] + ppm * stim[i]['speed'] * (frame * ifi) * np.sin(stim[i]['angle'] * np.pi/180)
-            }
-            #positions[frame][x] = (x,y)
-
-        return stimArray
-
     #calculates the frames for each segent of the trajectory
     def calculateTrajectory(self,name,i,sweep,ifi,ppm,xOffset,yOffset):
         global runTime,trajectoryStim
@@ -2180,7 +2133,7 @@ class App(QMainWindow):
             if segment == 0:
                 numFrames = int(round(float(liveTrajDict[name]['duration'][segment])/ifi)) #frames in the current segment
                 #numFrames = numFrames + (0.5 * stim[i]['width'] / stim[i]['speed']) #add extra frames to account for the center of the starting snake getting to the turn position
-                segmentFrames = np.zeros(numFrames)
+                segmentFrames = np.zeros(numFrames+1)
 
                 runTime[i]['trajectory']['startFrame'].append(0)
 
@@ -2190,34 +2143,36 @@ class App(QMainWindow):
 
                 if stim[i]['objectType'] == 'Snake':
                     #X position segment - half as much distance traveled because its a growing rectangle that is also changing its length simultaneously
-                    segmentFrames[:] = [startX + 0.5 * ppm * stim[i]['speed'] * ifi * t * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
+                    segmentFrames[:] = [startX + 0.5 * ppm * stim[i]['speed'] * ifi * t * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(0,numFrames+1,1)]
                     trajectoryStim[i]['xPos'] = np.append(trajectoryStim[i]['xPos'],segmentFrames)
 
                     #Y position segment
-                    segmentFrames[:] = [startY + 0.5 * ppm * stim[i]['speed'] * ifi * t * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
+                    segmentFrames[:] = [startY + 0.5 * ppm * stim[i]['speed'] * ifi * t * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(0,numFrames+1,1)]
                     trajectoryStim[i]['yPos'] = np.append(trajectoryStim[i]['yPos'],segmentFrames)
                 else:
                     #X position segment
-                    segmentFrames[:] = [startX + ppm * stim[i]['speed'] * ifi * t * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
+                    segmentFrames[:] = [startX + ppm * stim[i]['speed'] * ifi * t * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(0,numFrames+1,1)]
                     trajectoryStim[i]['xPos'] = np.append(trajectoryStim[i]['xPos'],segmentFrames)
 
                     #Y position segment
-                    segmentFrames[:] = [startY + ppm * stim[i]['speed'] * ifi * t * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
+                    segmentFrames[:] = [startY + ppm * stim[i]['speed'] * ifi * t * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(0,numFrames+1,1)]
                     trajectoryStim[i]['yPos'] = np.append(trajectoryStim[i]['yPos'],segmentFrames)
-
-
             else:
                 if stim[i]['objectType'] == 'Snake':
                     numFrames = int(round(float(liveTrajDict[name]['duration'][segment])/ifi)) #frames in the current segment
                     segmentFrames = np.zeros(numFrames)
 
                     size = len(trajectoryStim[i]['xPos'])
-                    prevStartPos = trajectoryStim[i]['xPos'][size-1] + 0.5 * ppm * (numFrames) * stim[i]['speed'] * ifi * np.cos(float(liveTrajDict[name]['angle'][segment-1]) * np.pi/180)
+                    # trajectoryStim[i]['xPos'] = np.append(trajectoryStim[i]['xPos'],trajectoryStim[i]['xPos'][size-1])
+                    # size += 1
+                    prevStartPos = trajectoryStim[i]['xPos'][size-1] + 0.5 * ppm * (numFrames-1) * stim[i]['speed'] * ifi * np.cos(float(liveTrajDict[name]['angle'][segment-1]) * np.pi/180)
                     segmentFrames[:] = [prevStartPos + 0.5 * ppm * stim[i]['speed'] * ifi * t * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
                     trajectoryStim[i]['xPos'] = np.append(trajectoryStim[i]['xPos'],segmentFrames)
 
                     size = len(trajectoryStim[i]['yPos'])
-                    prevStartPos = trajectoryStim[i]['yPos'][size-1]  + 0.5 * ppm * (numFrames) * stim[i]['speed'] * ifi * np.sin(float(liveTrajDict[name]['angle'][segment-1]) * np.pi/180)
+                    # trajectoryStim[i]['yPos'] = np.append(trajectoryStim[i]['yPos'],trajectoryStim[i]['yPos'][size-1])
+                    # size += 1
+                    prevStartPos = trajectoryStim[i]['yPos'][size-1]  + 0.5 * ppm * (numFrames-1) * stim[i]['speed'] * ifi * np.sin(float(liveTrajDict[name]['angle'][segment-1]) * np.pi/180)
                     segmentFrames[:] = [prevStartPos + 0.5 * ppm * stim[i]['speed'] * ifi * t * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
                     trajectoryStim[i]['yPos'] = np.append(trajectoryStim[i]['yPos'],segmentFrames)
                 else:
@@ -4951,10 +4906,12 @@ class App(QMainWindow):
 
             for object,_ in seqAssignLoaded.items():
                 for key,value in seqAssignLoaded[object].items():
-                    seqAssign[object][key]['control'] = seqAssignLoaded[object][key]['control']
-                    seqAssign[object][key]['parent'] = seqAssignLoaded[object][key]['parent']
-                    seqAssign[object][key]['sequence'] = seqAssignLoaded[object][key]['sequence']
-
+                    try:
+                        seqAssign[object][key]['control'] = seqAssignLoaded[object][key]['control']
+                        seqAssign[object][key]['parent'] = seqAssignLoaded[object][key]['parent']
+                        seqAssign[object][key]['sequence'] = seqAssignLoaded[object][key]['sequence']
+                    except:
+                        print('Error loading stimulus. Sequence assignment.')
 
             #convert string controls to object controls
             for object,_ in seqAssign.items():
