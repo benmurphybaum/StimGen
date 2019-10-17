@@ -442,7 +442,6 @@ class App(QMainWindow):
 
             currentObject = self.objectListBox.currentItem()
             objectNum = self.objectListBox.row(currentObject)
-            print(stim[objectNum]['batchStimList'])
             stim[objectNum]['batchStimList'].append(stimName)
 
         elif controlName == 'batchStimRemove':
@@ -4709,6 +4708,7 @@ class App(QMainWindow):
         trajDefs = json.dumps(trajDict)
         maskDefs = json.dumps(maskDict)
 
+
         #show input dialog for naming the sequence
         #stimulus = self.stimBank.currentItem()
         #stimName = stimulus.text() #current selection is default name
@@ -4891,15 +4891,18 @@ class App(QMainWindow):
 
             #reinitialize a fresh stim dict with all of the keys
             stim = {}
+            seqAssign = {}
 
             objectList = []
             numObjects = len(stimLoaded) #total number of loaded objects
+
             for i in range(numObjects):
                 objectList.append((stimLoaded[i]['objectType'])) #fill out the object list so addStimDict will work correctly
                 self.addStimDict()
 
             #assign the loaded stim/seqAssign dict into the actual stim/seqAssign dict
             #this allows for the loaded stim to have an incomplete stim dictionary, if new controls have been added
+
             for object,_ in stimLoaded.items():
                 for key,value in stimLoaded[object].items():
                     stim[object][key] = value
@@ -4911,6 +4914,14 @@ class App(QMainWindow):
                         seqAssign[object][key]['parent'] = seqAssignLoaded[object][key]['parent']
                         seqAssign[object][key]['sequence'] = seqAssignLoaded[object][key]['sequence']
                     except:
+                        print(stimLoaded)
+                        print('-------------------------')
+                        print('-------------------------')
+                        print(assignmentStr)
+                        print('-------------------------')
+                        print('-------------------------')
+                        print(seqAssignLoaded)
+                        return
                         print('Error loading stimulus. Sequence assignment.')
 
             #convert string controls to object controls
