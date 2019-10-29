@@ -4889,6 +4889,9 @@ class App(QMainWindow):
             stimLoaded = {int(k):v for k,v in stimLoaded.items()}
             seqAssignLoaded = {int(k):v for k,v in seqAssignLoaded.items()}
 
+            if len(stimLoaded) != len(seqAssignLoaded):
+                seqAssignLoaded.pop(len(stimLoaded),'None')
+
             #reinitialize a fresh stim dict with all of the keys
             stim = {}
             seqAssign = {}
@@ -4914,14 +4917,6 @@ class App(QMainWindow):
                         seqAssign[object][key]['parent'] = seqAssignLoaded[object][key]['parent']
                         seqAssign[object][key]['sequence'] = seqAssignLoaded[object][key]['sequence']
                     except:
-                        print(stimLoaded)
-                        print('-------------------------')
-                        print('-------------------------')
-                        print(assignmentStr)
-                        print('-------------------------')
-                        print('-------------------------')
-                        print(seqAssignLoaded)
-                        return
                         print('Error loading stimulus. Sequence assignment.')
 
             #convert string controls to object controls
