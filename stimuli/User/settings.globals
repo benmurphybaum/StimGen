@@ -1,0 +1,1 @@
+{"monitor": "1", "ppm": "0.3", "xOffset": "60", "yOffset": "76", "background": "0", "syncFrames": "0", "syncSpot": false, "gammaTable": "Custom", "triggerInterface": "Parallel Port", "parallelPortAddress": "0xE010", "digitalIn": "2", "digitalOut": "2"}

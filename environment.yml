@@ -1,0 +1,13 @@
+name: stim
+dependencies:
+  - python=3.6
+  - cython
+  - pip=20
+  - numpy
+  - tk
+  - h5py
+  - pip:
+    - MotionClouds
+    - psychopy
+    - nidaqmx
+    - pyqt5

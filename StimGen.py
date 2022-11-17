@@ -1,14 +1,26 @@
 #StimGen python
 
 #import widgets
-from PyQt5.QtWidgets import QApplication,QWidget,QMainWindow,QPushButton,QLineEdit,QGroupBox,QComboBox,QFrame,QAbstractItemView,QDesktopWidget
-from PyQt5.QtWidgets import QLabel,QListWidget,QListWidgetItem,QSpacerItem,QVBoxLayout,QGridLayout,QCheckBox,QInputDialog,QListView,QFontDialog
+from PyQt5.QtWidgets import QApplication,QWidget,QMainWindow,QMenuBar,QMenu,QAction,QPushButton,QLineEdit,QGroupBox,QComboBox,QFrame,QAbstractItemView,QDesktopWidget
+from PyQt5.QtWidgets import QLabel,QListWidget,QListWidgetItem,QSpacerItem,QVBoxLayout,QGridLayout,QCheckBox,QInputDialog,QListView,QFontDialog,QErrorMessage
 from PyQt5 import QtCore,QtGui
+
+#triggers
+
+global NI_FLAG 
+NI_FLAG = 0
+
+if NI_FLAG:
+    import nidaqmx as ni
 
 #from PyQt5.QtGui import QIcon, QPixmap
 
+#for stimulus centering
+# import keyboard
+
 #timing libraries
 from time import sleep
+from time import time
 
 #for monitor specifications
 # from win32api import GetSystemMetrics
@@ -16,39 +28,46 @@ from time import sleep
 #for plotting data
 #import matplotlib.pyplot as plt
 
+#triggers
+
+# from nidaqmx import system
+
 #for browsing file explorer
 import tkinter
 from tkinter import filedialog, Tk
 
-#triggers
-import nidaqmx as ni
+#for loading bitmap images
+from PIL import Image
 
 #for saving and loading stimuli from disk
 import json
 import os
+
 import h5py
 import csv
+
+import numpy as np
+
+from random import random, randint, seed
 
 #for copying dictionaries
 import copy
 
 #PsychoPy
-from psychopy import visual, core
+from psychopy import visual, core, parallel, event, monitors
 
 import platform
 
 #Motion Clouds
 import MotionClouds as mc
 
-import numpy as np
-
 #Build the GUI
 class App(QMainWindow):
 
     #startup code
     def __init__(self):
-        global objectList, seqList, trajList, maskList, stim, trajectoryStim, seqAssign, seqDict, trajDict, maskDict, basePath, stimPath, saveToPath, system
-        global scale_w,scale_h,device
+        global objectList, seqList, trajList, maskList, stim, globalSettings, trajectoryStim, seqAssign, seqDict, trajDict, maskDict, basePath, stimPath, imagePath, gammaPath, saveToPath, system
+        global scale_w,scale_h,device,isOpen,centeringActive,subfolder,gammaTable
 
         super(App,self).__init__()
 
@@ -58,27 +77,33 @@ class App(QMainWindow):
 
         # w = 2048
         # h = 1536
+
+        isOpen = 0 #stimulus window is closed
+        centeringActive = 0
+
         self.screen = QDesktopWidget().availableGeometry(1)
         w = self.screen.width()
         h = self.screen.height()
+
 
         #coded on 2880x1800 retina display
         scale_h = 1
         scale_w = 1
 
         #GUI dimensions
-        self.title = "StimGen 5.0"
+        self.title = "StimGen 6.0"
         self.left = 10 * scale_w
         self.top = 10 * scale_h
         self.width = 650 * scale_w
         self.height = 780 * scale_h
 
         #path to the StimGen.py file
-        #basePath = 'C:/Users/jadob/Desktop/StimGenPy_WIN/StimGen/'
-        basePath = '/Users/bmb/Documents/GitHub/StimGenPy_WIN/StimGen/'
+        # basePath = 'C:/Users/jadob/Desktop/StimGenPy_WIN/StimGen/'
+        basePath = '/Users/Owner/Desktop/StimGen/'
+        saveToPath = '/Users/Owner/Desktop/StimGen/StimulusLog/'
         stimPath = basePath + 'stimuli/'
         imagePath = basePath + 'images/'
-        saveToPath = '/Users/bmb/Documents/GitHub/StimGenPy_WIN/stimulusLog/'
+        gammaPath = basePath + 'gamma/'
 
         #operating system
         system = platform.system()
@@ -90,12 +115,15 @@ class App(QMainWindow):
             boldLarge = QtGui.QFont("Roboto", 12,weight=QtGui.QFont.Normal)
             titleFont = QtGui.QFont("Roboto Light",28,weight=QtGui.QFont.Light)
             subTitleFont = QtGui.QFont("Roboto Light",10,weight=QtGui.QFont.Light)
+            counterFont = QtGui.QFont('Roboto Light',18,weight=QtGui.QFont.Normal)
+
         elif system == 'Darwin':
             #fonts
             bold = QtGui.QFont("Helvetica", 12,weight=QtGui.QFont.Normal)
             boldLarge = QtGui.QFont("Helvetica", 14,weight=QtGui.QFont.Normal)
             titleFont = QtGui.QFont("Helvetica",32,weight=QtGui.QFont.Light)
             subTitleFont = QtGui.QFont("Helvetica",12,weight=QtGui.QFont.ExtraLight)
+            counterFont = QtGui.QFont('Helvetica',18,weight=QtGui.QFont.Normal)
 
         self.setWindowTitle(self.title)
         self.setGeometry(self.left,self.top,self.width,self.height)
@@ -138,7 +166,7 @@ class App(QMainWindow):
         self.designButton.move(215 * scale_w,280 * scale_h)
         self.designButton.setFixedSize(100 * scale_w,30 * scale_h)
         self.designButton.setFont(bold)
-        self.designButton.setStyleSheet('QPushButton {background-color: rgba(180, 245, 245, 255)}');
+        self.designButton.setStyleSheet('QPushButton {background-color: rgba(180, 245, 245, 255)}')
         self.designButton.clicked.connect(lambda: self.buttonProc("designButton"))
 
         self.masksButton = QPushButton('Masks',self)
@@ -154,22 +182,32 @@ class App(QMainWindow):
         self.sequencesButton.clicked.connect(lambda: self.buttonProc("sequencesButton"))
 
         self.runStimulus = QPushButton('Run',self)
-        self.runStimulus.move(10 * scale_w,720 * scale_h)
-        self.runStimulus.resize(75 * scale_w,30 * scale_h)
+        self.runStimulus.move(10 * scale_w + 5,720 * scale_h)
+        self.runStimulus.resize(60 * scale_w,30 * scale_h)
         self.runStimulus.setFont(boldLarge)
         self.runStimulus.setStyleSheet('QPushButton {background-color: rgba(150, 245, 150, 150)}')
         self.runStimulus.clicked.connect(lambda: self.buttonProc("runStimulus"))
 
         self.abortStimulus = QPushButton('Abort',self)
         self.abortStimulus.move(90 * scale_w,720 * scale_h)
-        self.abortStimulus.resize(75 * scale_w,30 * scale_h)
+        self.abortStimulus.resize(60 * scale_w,30 * scale_h)
         self.abortStimulus.setFont(boldLarge)
         self.abortStimulus.setStyleSheet('QPushButton {background-color: rgba(245, 150, 150, 150)}')
         self.abortStimulus.clicked.connect(lambda: self.buttonProc("abortStimulus"))
 
+        
+
         self.sequenceMessage = QLabel('',self)
         self.sequenceMessage.move(175 * scale_w,720 * scale_h)
-        self.sequenceMessage.resize(300 * scale_w,60 * scale_h)
+        self.sequenceMessage.resize(775 * scale_w,60 * scale_h)
+
+        self.stimCountDown = QLabel('',self)
+        self.stimCountDown.setFont(counterFont)
+        self.stimCountDown.move(25 * scale_w,750 * scale_h)
+
+        self.sweepMonitor = QLabel('',self)
+        self.sweepMonitor.setFont(counterFont)
+        self.sweepMonitor.move(105 * scale_w,750 * scale_h)
 
         #Object List
         objectList = ['Circle']
@@ -202,6 +240,7 @@ class App(QMainWindow):
         #Make first stimulus and sequence assignment dictionaries
         stim = {}
         trajectoryStim = {}
+        globalSettings = {}
 
         seqAssign = {} #holds sequence assignments for each control
         seqDict = {} #holds the actual sequence entries
@@ -210,22 +249,277 @@ class App(QMainWindow):
 
         self.addStimDict()
 
+        #initialize the global settings
+        self.setGlobalSettingsDict()
+
+        #load global settings file
+        self.loadGlobalSettings()
+
         #get the stimulus files
         self.getStimulusBank()
 
         #get the stimulus images
         self.getImageBank()
 
+        #get the saved frames bank
+        self.getFrameBank()
+
         if self.stimBank.count() > 0:
             self.stimBank.setCurrentRow(0)
             self.loadStimulus()
 
+        subfolder = self.subFolder.currentText()
+
+        self.setupMenu()
+
         #show the GUI
         self.show()
 
-        #globals
-        global isOpen
-        isOpen = 0 #stimulus window is closed
+        #load the gamma table according to the menu selection
+        gammafile = gammaPath + 'gammaTableRig4_12bit.txt'
+        gammaTable = np.loadtxt(gammafile,dtype=int)
+
+        #set the default to custom gamma table
+        self.gammaTable.setCurrentText('Custom')
+        
+    #Sets up the menu items in the status bar
+    def setupMenu(self):
+
+        myMenu = QMenuBar(self)
+        myMenu.setGeometry(0,0,200,20)
+
+        #Session Menu
+        initSessionAction = QAction('&Initialize', self)
+        initSessionAction.triggered.connect(self.initializeSession)
+        closeSessionAction = QAction('&Close Session', self)
+        closeSessionAction.triggered.connect(self.closeStimGenSession)
+
+        sessionMenu = myMenu.addMenu('Session')
+        sessionMenu.addAction(initSessionAction)
+        sessionMenu.addAction(closeSessionAction)
+
+        #Stimuli Menu
+        saveStimulusAction = QAction('&Save Stimulus',self)
+        deleteStimulusAction = QAction('&Delete Stimulus',self)
+        newUserAction = QAction('&Add New User',self)
+        exportFramesAction = QAction('&Export Frames',self)
+
+        saveStimulusAction.triggered.connect(self.saveStimulus)
+        deleteStimulusAction.triggered.connect(self.deleteStimulus)
+        newUserAction.triggered.connect(self.createNewUser)
+        exportFramesAction.triggered.connect(self.saveFramesToDisk)
+
+        stimuliMenu = myMenu.addMenu('Stimuli')
+        stimuliMenu.addAction(saveStimulusAction)
+        stimuliMenu.addAction(deleteStimulusAction)
+        stimuliMenu.addAction(newUserAction)
+        stimuliMenu.addAction(exportFramesAction)
+
+        #Calibration Menu
+        centerStimulusAction = QAction('&Center Stimulus',self)
+        centerStimulusAction.triggered.connect(self.centerStimulus)
+
+        measureFrameRateAction = QAction('&Measure Frame Rate',self)
+        measureFrameRateAction.triggered.connect(self.measureFrameRate)
+
+        saveGlobalSettingsAction = QAction('&Save Global Settings',self)
+        saveGlobalSettingsAction.triggered.connect(self.saveGlobalSettings_Verbose)
+
+        setupTriggerAction = QAction('&Setup Triggers',self)
+        setupTriggerAction.triggered.connect(self.setupTriggers)
+
+        calibrationMenu = myMenu.addMenu('Calibration')
+        calibrationMenu.addAction(centerStimulusAction)
+        calibrationMenu.addAction(measureFrameRateAction)
+        calibrationMenu.addAction(saveGlobalSettingsAction)
+        calibrationMenu.addAction(setupTriggerAction)
+
+    #Opens up a wizard for dynamically centering the projector with the IR image from the microscope
+    def centerStimulus(self):
+        global centeringActive, isOpen, win
+
+        ppm = float(self.ppm.text())
+
+        background = self.getBackground()
+
+        #get the starting position of the crosshairs from the current offset position
+        startX = int(float(self.xOffset.text()) * ppm)
+        startY = int(float(self.yOffset.text()) * ppm)
+
+        if isOpen == 0:
+            self.initializeSession()
+        else:
+            self.closeStimGenSession()
+            self.initializeSession()
+
+        isOpen = 1
+
+        #Make a crosshairs stimulus
+        self.horizCross = visual.Rect(
+            win = win,
+            units = 'pix',
+            width = 1,
+            height = 500,
+            ori = 0,
+            fillColor = [1,1,1],
+            lineColor = [1,1,1],
+            contrast = 1,
+            pos = (startX,startY)
+            )
+
+        self.vertCross = visual.Rect(
+            win = win,
+            units = 'pix',
+            width = 1,
+            height = 500,
+            ori = 90,
+            fillColor = [1,1,1],
+            lineColor = [1,1,1],
+            contrast = 1,
+            pos = (startX,startY)
+            )
+
+        self.innerRingDark = visual.Circle(
+            win = win,
+            units = 'pix',
+            radius = 100*ppm/2,
+            fillColor = [1,1,1],
+            lineColor = [1,1,1],
+            contrast = background,
+            edges = 100,
+            pos = (startX,startY)
+            )
+
+        self.innerRingBright = visual.Circle(
+             win = win,
+            units = 'pix',
+            radius = 110*ppm/2,
+            fillColor = [1,1,1],
+            lineColor = [1,1,1],
+            contrast = 1,
+            edges = 100,
+            pos = (startX,startY)
+        )
+
+        self.outerRingDark = visual.Circle(
+            win = win,
+            units = 'pix',
+            radius = 200*ppm/2,
+            fillColor = [1,1,1],
+            lineColor = [1,1,1],
+            contrast = background,
+            edges = 100,
+            pos = (startX,startY)
+            )
+
+        self.outerRingBright = visual.Circle(
+             win = win,
+            units = 'pix',
+            radius = 210*ppm/2,
+            fillColor = [1,1,1],
+            lineColor = [1,1,1],
+            contrast = 1,
+            edges = 100,
+            pos = (startX,startY)
+        )
+
+        self.outerRingBright.draw()
+        self.outerRingDark.draw()
+        
+        self.innerRingBright.draw()
+        self.innerRingDark.draw()
+
+        self.horizCross.draw()
+        self.vertCross.draw()
+        win.flip()
+
+        centeringActive = 1
+        
+        while centeringActive == 1:
+            key = event.waitKeys(maxWait=0.1,keyList=['left','right','up','down','return'],clearEvents=True)
+
+            if key is None:
+                continue
+            elif key[0] == 'return':
+                centeringActive == 0
+                break
+            else:
+                self.moveCenterPos(key[0])
+       
+
+        #assign the new center position to the globals
+        (x,y) = self.horizCross.pos
+
+        self.xOffset.setText(str(int(float(x/ppm))))
+        self.yOffset.setText(str(int(float(y/ppm))))
+        self.setGlobalSettingsDict()
+        self.saveGlobalSettings()
+
+        #flip to a blank screen again
+        win.flip()
+
+    #For stimulus centering, moves the crosshairs with arrow keystrokes
+    def moveCenterPos(self,direction):
+
+        if direction == 'left':
+            x,y = self.horizCross.pos
+            self.horizCross.setPos((x-1,y))
+            self.vertCross.setPos((x-1,y))
+            
+            self.outerRingBright.setPos((x-1,y))
+            self.outerRingDark.setPos((x-1,y))
+            
+            self.innerRingBright.setPos((x-1,y))
+            self.innerRingDark.setPos((x-1,y))
+
+        elif direction == 'right':
+            x,y = self.horizCross.pos
+            self.horizCross.setPos((x+1,y))
+            self.vertCross.setPos((x+1,y))
+
+            self.outerRingBright.setPos((x+1,y))
+            self.outerRingDark.setPos((x+1,y))
+            
+            self.innerRingBright.setPos((x+1,y))
+            self.innerRingDark.setPos((x+1,y))
+
+        elif direction == 'up':
+            x,y = self.horizCross.pos
+            self.horizCross.setPos((x,y+1))
+            self.vertCross.setPos((x,y+1))
+
+            self.outerRingBright.setPos((x,y+1))
+            self.outerRingDark.setPos((x,y+1))
+            
+            self.innerRingBright.setPos((x,y+1))
+            self.innerRingDark.setPos((x,y+1))
+
+        elif direction == 'down':
+            x,y = self.horizCross.pos
+            self.horizCross.setPos((x,y-1))
+            self.vertCross.setPos((x,y-1))
+
+            self.outerRingBright.setPos((x,y-1))
+            self.outerRingDark.setPos((x,y-1))
+            
+            self.innerRingBright.setPos((x,y-1))
+            self.innerRingDark.setPos((x,y-1))
+
+        self.outerRingBright.draw()
+        self.outerRingDark.draw()
+        
+        self.innerRingBright.draw()
+        self.innerRingDark.draw()
+
+        self.horizCross.draw()
+        self.vertCross.draw()
+        
+        win.flip()
+
+    #Opens a window for defining input/output trigger addresses
+    def setupTriggers(self):
+        self.triggerMenu = triggerMenu()
+        self.triggerMenu.show()
 
     #Handles all variable entries
     def variableProc(self,controlName,entry):
@@ -235,6 +529,9 @@ class App(QMainWindow):
 
         #Need to check each variable for validity
         if controlName == 'background':
+            #update the globals dict
+            self.setGlobalSettingsDict()
+
             bgnd = self.getBackground()
             try:
                 win.color= [bgnd,bgnd,bgnd]
@@ -287,18 +584,49 @@ class App(QMainWindow):
             else:
                 control[controlName].setText('0')
                 stim[0][controlName] = 0.0
+        elif controlName == 'TargetResolution':
+            #Must ensure that the target resolution for checkerboard noise is a multiple of the noise pixel size.
+            pixelSize = float(self.noiseSize.text())
+            target = float(entry)
+
+            div = np.round(pixelSize / target)
+            pixelSize = div * target
+            index = self.objectListBox.currentRow()
+            stim[index][controlName] = int(target)
+            stim[index]['noiseSize'] = int(pixelSize)
+            self.noiseSize.setText(str(pixelSize))
+
+        elif controlName == 'noiseSize':
+            if self.PositionalShiftType.currentText() == 'Random':
+                target = float(self.TargetResolution.text())
+                pixelSize = float(entry)
+
+                div = np.round(pixelSize / target)
+                pixelSize = div * target
+                index = self.objectListBox.currentRow()
+                stim[index]['TargetResolution'] = int(target)
+                stim[index][controlName] = int(pixelSize)
+                self.noiseSize.setText(str(pixelSize))
+            else:  
+                index = self.objectListBox.currentRow()
+                stim[index][controlName] = int(entry)
         else:
             #all other variable controls
             #Assign variable entry to the stim dictionary for the selected object
-            index = self.objectListBox.currentRow()
-            if self.isFloat(entry):
-                stim[index][controlName] = float(entry)   #some need to be float though
+            keys = list(globalSettings.keys())
+            if controlName in keys:
+                #Update the global settings dict in case a global has been changed
+                self.setGlobalSettingsDict()
             else:
-                try:
-                    stim[index][controlName] = int(entry)
-                except:
-                    control[controlName].setText('0')
-                    stim[index][controlName] = 0
+                index = self.objectListBox.currentRow()
+                if self.isFloat(entry):
+                    stim[index][controlName] = float(entry)   #some need to be float though
+                else:
+                    try:
+                        stim[index][controlName] = int(entry)
+                    except:
+                        control[controlName].setText('0')
+                        stim[index][controlName] = 0
 
     #Handles all button clicks
     def buttonProc(self,controlName):
@@ -306,13 +634,13 @@ class App(QMainWindow):
 
         if  controlName == 'designButton':
             self.designPanel.show()
-            self.designButton.setStyleSheet('QPushButton {background-color: rgba(180, 245, 245, 255)}');
+            self.designButton.setStyleSheet('QPushButton {background-color: rgba(180, 245, 245, 255)}')
 
             self.maskPanel.hide()
-            self.masksButton.setStyleSheet('QPushButton {background-color: rgba(255, 255, 255, 255)}');
+            self.masksButton.setStyleSheet('QPushButton {background-color: rgba(255, 255, 255, 255)}')
 
             self.sequencePanel.hide()
-            self.sequencesButton.setStyleSheet('QPushButton {background-color: rgba(255, 255, 255, 255)}');
+            self.sequencesButton.setStyleSheet('QPushButton {background-color: rgba(255, 255, 255, 255)}')
 
             #Bug when masks are changed sometimes grating settings go back to circle settings
             self.setContextualMenus() #ensures that the parameters have the correct settings.
@@ -320,23 +648,23 @@ class App(QMainWindow):
 
         elif controlName == 'masksButton':
             self.designPanel.hide()
-            self.designButton.setStyleSheet('QPushButton {background-color: rgba(255, 255, 255, 255)}');
+            self.designButton.setStyleSheet('QPushButton {background-color: rgba(255, 255, 255, 255)}')
 
             self.maskPanel.show()
-            self.masksButton.setStyleSheet('QPushButton {background-color: rgba(180, 245, 245, 255)}');
+            self.masksButton.setStyleSheet('QPushButton {background-color: rgba(180, 245, 245, 255)}')
 
             self.sequencePanel.hide()
-            self.sequencesButton.setStyleSheet('QPushButton {background-color: rgba(255, 255, 255, 255)}');
+            self.sequencesButton.setStyleSheet('QPushButton {background-color: rgba(255, 255, 255, 255)}')
 
         elif controlName == 'sequencesButton':
             self.designPanel.hide()
-            self.designButton.setStyleSheet('QPushButton {background-color: rgba(255, 255, 255, 255)}');
+            self.designButton.setStyleSheet('QPushButton {background-color: rgba(255, 255, 255, 255)}')
 
             self.maskPanel.hide()
-            self.masksButton.setStyleSheet('QPushButton {background-color: rgba(255, 255, 255, 255)}');
+            self.masksButton.setStyleSheet('QPushButton {background-color: rgba(255, 255, 255, 255)}')
 
             self.sequencePanel.show()
-            self.sequencesButton.setStyleSheet('QPushButton {background-color: rgba(180, 245, 245, 255)}');
+            self.sequencesButton.setStyleSheet('QPushButton {background-color: rgba(180, 245, 245, 255)}')
 
         elif controlName == 'initSession':
             #Open a stimulus window
@@ -344,11 +672,7 @@ class App(QMainWindow):
 
         elif controlName == 'closeSession':
             #Close the stimulus window
-            try:
-                win.close()
-                isOpen = 0 #window is open
-            except NameError:
-                return
+            self.closeStimGenSession()
 
         elif controlName == 'runStimulus':
             #Reset abort abortStatus
@@ -358,7 +682,7 @@ class App(QMainWindow):
                 return 0
 
             #Run the stimulus
-            self.runStim()
+            self.runStim(0)
 
             #save data to stimulus log
             if abortStatus == 0:
@@ -368,6 +692,9 @@ class App(QMainWindow):
 
         elif controlName == 'abortStimulus':
             self.abortStim()
+
+        elif controlName == 'startEphys':
+            self.triggerEphys()
 
         elif controlName == 'addObject':
             self.addStimObject()
@@ -393,6 +720,17 @@ class App(QMainWindow):
 
             trajDict[name]['angle'].append(self.trajAngle.text())
             trajDict[name]['duration'].append(self.trajDuration.text())
+            trajDict[name]['speed'].append(self.trajSpeed.text())
+            trajDict[name]['link'].append(self.trajLink.text())
+
+            self.updateTrajectory(name)
+        elif controlName == 'appendHold':
+            item = self.trajListBox.currentItem() #which trajectory
+            name = item.text()
+            trajDict[name]['angle'].append('0')
+            trajDict[name]['duration'].append(self.trajDuration.text())
+            trajDict[name]['speed'].append('*Hold*')
+            trajDict[name]['link'].append('0')
 
             self.updateTrajectory(name)
 
@@ -403,12 +741,25 @@ class App(QMainWindow):
             #selected segment is the same for the duration list box
             index = self.angleListBox.currentRow()
 
+            
             #edit the entry in place
             trajDict[name]['angle'][index] = self.trajAngle.text()
             trajDict[name]['duration'][index] = self.trajDuration.text()
+            trajDict[name]['speed'][index] = self.trajSpeed.text()
+            trajDict[name]['link'][index] = self.trajLink.text()
 
             self.updateTrajectory(name)
+        elif controlName == 'removeSegment':
+            # item = self.trajListBox.currentItem() #which trajectory
+            # name = item.text()
 
+            # #selected segment is the same for the duration list box
+            # index = self.angleListBox.currentRow()
+
+            #  #edit the entry in place
+            # trajDict[name]['angle'][index] = self.trajAngle.text()
+            # trajDict[name]['duration'][index] = self.trajDuration.text()
+            print('Need to code')
         elif controlName == 'saveStim':
             self.saveStimulus()
 
@@ -459,6 +810,9 @@ class App(QMainWindow):
             currentObject = self.objectListBox.currentItem()
             objectNum = self.objectListBox.row(currentObject)
             stim[objectNum]['batchStimList'].pop(index)
+        elif controlName == 'sendTTL':
+            (interface,digitalOut,digitalIn,portAddress) = self.getTriggerSettings()
+            self.sendTTLPulse(interface,digitalOut,digitalIn,portAddress)
         else:
             #default
             print('other')
@@ -468,14 +822,23 @@ class App(QMainWindow):
 
         saveToPath = self.saveToPath.text()
 
+        if len(saveToPath) == 0:
+            return
+
         #ensure valid path
         if saveToPath.endswith('/') == False:
             saveToPath = saveToPath + '/'
 
+        if os.path.isdir(saveToPath) == 0:
+            os.mkdir(saveToPath[:-1])
+
         fileName = self.fileName.text()
         if len(fileName) == 0:
-            return #only save if a file name has been provided
+            path = saveToPath + 'StimulusLog.txt'
+            # return #only save if a file name has been provided
         else:
+            if fileName.endswith('.txt') == False:
+                fileName = fileName + '.txt'
             path = saveToPath + fileName
 
         #which stimulus is selected
@@ -508,9 +871,16 @@ class App(QMainWindow):
             writer.writerow([]) #blank spacer row at end
             file.close()
 
+    def convertBitDepth(self,val,valDepth,bitDepth):
+        #valDepth: original bit depth
+        #BitDepth: new bit depth
+
+        converted = (2**bitDepth - 1) * (val / (2**valDepth - 1))
+        return converted
+
     #Handles all drop down menu selections
     def menuProc(self,controlName,selection):
-        global objectList, stim, seqAssign, win, main,subfolder
+        global objectList, stim, seqAssign, win, subfolder, globalSettings, gammaTable, BitDepth
 
         #Set contextual menus
         self.flipControls(controlName,selection)
@@ -535,13 +905,20 @@ class App(QMainWindow):
 
             #which object?
             object = self.objectListBox.currentRow()
-
+            
             seqAssign[object][controlName]['sequence'] = selection
-            if selection != 'None':
-                seqAssign[object][controlName]['control'].setStyleSheet("background-color: rgba(150, 245, 150, 150)")
-            else:
-                seqAssign[object][controlName]['control'].setStyleSheet("background-color: white")
-                seqAssign[object][controlName]['control'].setStyleSheet("color: black")
+
+            try:
+                if selection != 'None':
+                    seqAssign[object][controlName]['control'].setStyleSheet("background-color: rgba(150, 245, 150, 150)")
+                else:
+                    seqAssign[object][controlName]['control'].setStyleSheet("background-color: white")
+                    seqAssign[object][controlName]['control'].setStyleSheet("color: black")
+                pass
+            except:
+                print('except')
+                pass
+            
 
             #display assigned sequences to the GUI
             self.displaySeqAssignments(object)
@@ -564,21 +941,125 @@ class App(QMainWindow):
 
         elif controlName == 'apertureStatus':
             stim[0][controlName] = selection
+        elif controlName == 'PositionalShiftType':
+            #Must ensure that the target resolution for checkerboard noise is a multiple of the noise pixel size.
+            if selection == 'Random':
+                pixelSize = float(self.noiseSize.text())
+                target = float(self.TargetResolution.text())
 
+                if target == 0:
+                    target = pixelSize
+
+                div = np.round(pixelSize / target)
+                pixelSize = div * target
+                index = self.objectListBox.currentRow()
+                stim[index]['TargetResolution'] = int(target)
+                stim[index]['noiseSize'] = int(pixelSize)
+                self.noiseSize.setText(str(pixelSize))
+
+            stim[index][controlName] = selection
+        
         elif controlName == 'gammaTable':
-            if isOpen:
-                #win.gamma = float(selection)
-                mon = monitors.Monitor('Generic Non-PnP Monitor')
-                mon.setGamma(float(self.gammaTable.currentText()))
+            if selection == 'Native':
+                gammafile = gammaPath + 'gammaTableLinear_' + str(BitDepth) + 'bit.txt'
+            elif selection == 'Custom':
+                gammafile = gammaPath + 'gammaTableRig4_' + str(BitDepth) + 'bit.txt'
+            
+            #load the gamma table according to the menu selection
+            gammaTable = np.loadtxt(gammafile,dtype=int)
+            
+            #update the globals dict
+            self.setGlobalSettingsDict()
+
+            #apply background with the new gamma table
+            bgnd = self.getBackground()
+            try:
+                win.color= [bgnd,bgnd,bgnd]
+                win.flip()
                 win.flip()
 
+                #Double flip, one to send new bgnd to buffer, then another to flip buffer to screen
+                #Flip the sync spot
+                win.flip()
+
+                #build the sync spot stimulus object
+                syncSpot = visual.Rect(
+                win = win,
+                units = 'pix',
+                width = 80 * ppm,
+                height = 80 * ppm,
+                fillColor = [1,1,1],
+                lineColor = [1,1,1],
+                contrast = -1,
+                pos = (532-40,-404+40)
+                )
+
+                self.drawSyncSpot(syncSpot,-1) #draw sync spot to dark if it's checked
+                win.flip()
+            except:
+                return
+        elif controlName == 'encoding':
+            bgnd = int(self.background.text())
+         
+            bgnd = self.convertBitDepth(bgnd,BitDepth,int(selection))
+            self.background.setText(str(round(bgnd)))
+
+            BitDepth = int(selection)
+        
+            gammatableStr = self.gammaTable.currentText()
+            if gammatableStr == 'Native':
+                gammafile = gammaPath + 'gammaTableLinear_' + selection + 'bit.txt'
+            else:
+                gammafile = gammaPath + 'gammaTableRig4_' + selection + 'bit.txt'
+            
+            #load the gamma table according to the menu selection
+            gammaTable = np.loadtxt(gammafile,dtype=int)
+            
+            #update the globals dict
+            self.setGlobalSettingsDict()
+
+            #apply background with the new gamma table
+            bgnd = self.getBackground()
+            try:
+                win.color= [bgnd,bgnd,bgnd]
+                win.flip()
+                win.flip()
+
+                #Double flip, one to send new bgnd to buffer, then another to flip buffer to screen
+                #Flip the sync spot
+                win.flip()
+
+                #build the sync spot stimulus object
+                syncSpot = visual.Rect(
+                win = win,
+                units = 'pix',
+                width = 80 * ppm,
+                height = 80 * ppm,
+                fillColor = [1,1,1],
+                lineColor = [1,1,1],
+                contrast = -1,
+                pos = (532-40,-404+40)
+                )
+
+                self.drawSyncSpot(syncSpot,-1) #draw sync spot to dark if it's checked
+                win.flip()
+            except:
+                return
+
         elif controlName == 'subFolder':
+
+            if subfolder == selection:
+                return
+
             subfolder = selection
-            #get the stimulus files
-            self.getStimulusBank()
-            if self.stimBank.count() > 0:
-                self.stimBank.setCurrentRow(0)
-                self.loadStimulus()
+            self.loadUserProfile(subfolder)
+        elif controlName == 'subsubFolder':
+            subfolder = selection
+            self.changeUserSubFolder(subfolder)
+
+        elif controlName == 'monitor':
+            globalSettings['monitor'] = selection
+
         else:
             #add parameter to stim dictionary for all other drop down menus (motionType,coordinateType, etc...)
             stim[index][controlName] = selection
@@ -606,6 +1087,8 @@ class App(QMainWindow):
 
         elif controlName == 'angleListBox':
             self.durationListBox.setCurrentRow(index)
+            self.speedListBox.setCurrentRow(index)
+            self.linkApertureListBox.setCurrentRow(index)
 
             whichTrajectory = self.trajListBox.currentRow()
             name = trajList[whichTrajectory + 1]
@@ -615,9 +1098,13 @@ class App(QMainWindow):
 
             self.trajAngle.setText(trajDict[name]['angle'][index])
             self.trajDuration.setText(trajDict[name]['duration'][index])
+            self.trajSpeed.setText(trajDict[name]['speed'][index])
+            self.trajLink.setText(trajDict[name]['link'][index])
 
         elif controlName == 'durationListBox':
             self.angleListBox.setCurrentRow(index)
+            self.speedListBox.setCurrentRow(index)
+            self.linkApertureListBox.setCurrentRow(index)
 
             whichTrajectory = self.trajListBox.currentRow()
             name = trajList[whichTrajectory + 1]
@@ -626,8 +1113,41 @@ class App(QMainWindow):
 
             self.trajAngle.setText(trajDict[name]['angle'][index])
             self.trajDuration.setText(trajDict[name]['duration'][index])
+            self.trajSpeed.setText(trajDict[name]['speed'][index])
+            self.trajLink.setText(trajDict[name]['link'][index])
+            
+        elif controlName == 'speedListBox':
+            self.angleListBox.setCurrentRow(index)
+            self.durationListBox.setCurrentRow(index)
+            self.linkApertureListBox.setCurrentRow(index)
+
+            whichTrajectory = self.trajListBox.currentRow()
+            name = trajList[whichTrajectory + 1]
+            if(name == 'None'):
+                return
+
+            self.trajAngle.setText(trajDict[name]['angle'][index])
+            self.trajDuration.setText(trajDict[name]['duration'][index])
+            self.trajSpeed.setText(trajDict[name]['speed'][index])
+            self.trajLink.setText(trajDict[name]['link'][index])
+
+        elif controlName == 'linkApertureListBox':
+            self.angleListBox.setCurrentRow(index)
+            self.durationListBox.setCurrentRow(index)
+            self.speedListBox.setCurrentRow(index)
+
+            whichTrajectory = self.trajListBox.currentRow()
+            name = trajList[whichTrajectory + 1]
+            if(name == 'None'):
+                return
+
+            self.trajAngle.setText(trajDict[name]['angle'][index])
+            self.trajDuration.setText(trajDict[name]['duration'][index])
+            self.trajSpeed.setText(trajDict[name]['speed'][index])
+            self.trajLink.setText(trajDict[name]['link'][index])
 
         elif controlName == 'stimBank':
+            
             self.loadStimulus()
 
         elif controlName == 'maskObjectListBox':
@@ -639,28 +1159,85 @@ class App(QMainWindow):
 
     #handles all checkboxes
     def checkProc(self,controlName,isChecked):
+        global globalSettings
+
         ppm = float(self.ppm.text())
 
         if controlName == 'syncSpot':
             #sync spot
             if isChecked:
-                syncSpot = visual.Rect(
-                win = win,
-                units = 'pix',
-                width = 80 * ppm,
-                height = 80 * ppm,
-                fillColor = [1,1,1],
-                lineColor = [1,1,1],
-                contrast = -1,
-                pos = (532-40,-404+40)
-                )
-
                 if isOpen == 1:
+                    syncSpot = visual.Rect(
+                    win = win,
+                    units = 'pix',
+                    width = 80 * ppm,
+                    height = 80 * ppm,
+                    fillColor = [1,1,1],
+                    lineColor = [1,1,1],
+                    contrast = -1,
+                    pos = (532-40,-404+40)
+                    )
+
                     syncSpot.draw()
                     win.flip()
+                globalSettings['syncSpot'] = True
             else:
+                globalSettings['syncSpot'] = False
                 if isOpen == 1:
                     win.flip()
+
+    def changeUserSubFolder(self,subsubfolder):
+        global subfolder
+
+        #clear the stimulus bank
+        self.stimBank.clear()
+        stimList = []
+
+        #check the subfolder
+        subfolder = self.subFolder.currentText()
+
+        #add subfolder if it is there
+        if len(subsubfolder) > 0:
+            path = stimPath + subfolder + "/" + subsubfolder
+
+        #get the files within the selected subsubfolder
+        fileList = os.listdir(path)
+
+        i = 0
+        for _ in fileList:
+            fileList[i],ext = os.path.splitext(fileList[i])
+
+            #only accept .stim files (these are just text files with .stim extension)
+            if ext == '.stim':
+                stimList.append(fileList[i])
+            i += 1
+
+        #append items to the stimulus bank
+        if len(stimList) > 0:
+            self.stimBank.addItems(stimList)
+
+            #alphabetical order
+            self.stimBank.sortItems(QtCore.Qt.AscendingOrder)
+
+        if self.stimBank.count() > 0:
+            self.stimBank.setCurrentRow(0)
+            self.loadStimulus()
+
+    #loads the indicated user profile stimulus bank and global settings
+    def loadUserProfile(self,profile):
+        global subfolder
+
+        #set the subfolder global to the profile of interest
+        subfolder = profile
+
+        #get the stimulus files
+        self.getStimulusBank()
+        if self.stimBank.count() > 0:
+            self.stimBank.setCurrentRow(0)
+            self.loadStimulus()
+
+        #update the global settings for the new user
+        self.loadGlobalSettings()
 
     #removes a mask from the stimulus
     def removeMaskObject(self):
@@ -824,6 +1401,86 @@ class App(QMainWindow):
             entry = ','.join(entry)
             self.seqEntry.setText(entry)
 
+
+    def CheckSequenceType(self,entry):
+        #check if the sequence is an expression or a list of values
+
+        if isinstance(entry,list):
+            entry = str(entry)
+
+        if 'x' in entry:
+            return 'Expression'
+        elif '[' in entry:
+            return 'Expression'
+        else:
+            return 'List'
+            
+                
+    def SeqExpressionLen(self,entry):
+        
+        if isinstance(entry,list):
+            entry = str(entry)
+        
+        start = entry.find('[') + 1
+        end = entry.find(']',start)
+        
+        sweeps = entry[start:end]
+        
+        if(len(sweeps) == 0):
+            nSweeps = 1
+        else:
+            nSweeps = int(sweeps)
+
+        return nSweeps
+
+    def resolveSeqExpression(self,entry,sweep):
+        #sweepLenList holds the number of sweeps in each list item of a sequence
+
+        whichSweep = 0
+        whichEntry = 0
+
+        for subEntry in entry:
+           
+            entryType = self.CheckSequenceType(subEntry)
+
+            if entryType == 'Expression':
+                expLen = self.SeqExpressionLen(subEntry)
+                whichSweep += expLen
+            else:
+                expLen = 1
+                whichSweep += 1
+
+            if sweep < whichSweep:
+                offset = sweep - (whichSweep - expLen)
+                break
+            whichEntry += 1
+
+        #Get the correct entry position in the sequence
+        entry = entry[whichEntry]
+
+        entryType = self.CheckSequenceType(entry)
+
+        if entryType == 'List':
+            return float(entry)
+
+        isRand = entry.find('rand(')
+        
+        if isRand == -1:
+            #eliminates the sweep length indicator
+            end = entry.find('[')
+            entry = entry[0:end]
+        else:
+            #eliminates the randomize indicator and sweep length indicator
+            end = entry.find('[')
+            entry = entry[isRand+5:end]    
+
+        #replace all 'x' values with the sweep number
+        entry = entry.replace('x',str(offset))
+
+        result = eval(entry)
+
+        return result
+
     #adds a new trajectory
     def addTrajectory(self):
         global trajList,trajDict
@@ -844,10 +1501,14 @@ class App(QMainWindow):
         #reset the trajectory angle/duration variables
         self.trajAngle.setText('0')
         self.trajDuration.setText('0')
+        self.trajSpeed.setText('0')
+        self.trajLink.setText('0')
 
         #clear the angle/duration list boxes
         self.angleListBox.clear()
         self.durationListBox.clear()
+        self.speedListBox.clear()
+        self.linkApertureListBox.clear()
 
         #add trajectory to the trajectory menu
         self.trajectory.addItem(name)
@@ -855,7 +1516,9 @@ class App(QMainWindow):
         #add empty trajectory to the seqDict
         trajDict[name] = {
         'angle':[],
-        'duration':[]
+        'duration':[],
+        'speed':[],
+        'link':[]
         }
 
     #deletes the selected trajectory
@@ -887,6 +1550,8 @@ class App(QMainWindow):
             #clear old values
             self.angleListBox.clear()
             self.durationListBox.clear()
+            self.speedListBox.clear()
+            self.linkApertureListBox.clear()
             return
         else:
             item = self.trajListBox.currentItem() #new selection
@@ -895,16 +1560,51 @@ class App(QMainWindow):
 
     #updates the angle/duration list boxes for the selected trajectory
     def updateTrajectory(self,name):
+        global trajDict
+
+        #what row is selected?
+        row = self.angleListBox.currentRow()
+
         #clear old values
         self.angleListBox.clear()
         self.durationListBox.clear()
-
+        self.speedListBox.clear()
+        self.linkApertureListBox.clear()
+        
         #update with new values
         angleList = trajDict[name]['angle']
         durList = trajDict[name]['duration']
 
         self.angleListBox.addItems(angleList)
         self.durationListBox.addItems(durList)
+
+        #check for 'speed' key, due to update compatability
+        if 'speed' in trajDict[name].keys():
+            speedList = trajDict[name]['speed']
+        else:
+            for trajectory in trajDict:
+                angleList = trajDict[trajectory]['angle']
+                speedList = ['0' for _ in range(len(angleList))]
+                trajDict[trajectory]['speed'] = speedList
+
+        self.speedListBox.addItems(speedList)
+
+        #check for 'link' key, due to update compatability
+        if 'link' in trajDict[name].keys():
+            linkList = trajDict[name]['link']
+        else:
+            for trajectory in trajDict:
+                angleList = trajDict[trajectory]['angle']
+                linkList = ['0' for _ in range(len(angleList))]
+                trajDict[trajectory]['link'] = linkList
+
+        self.linkApertureListBox.addItems(linkList)
+
+        #set the selected row to what it originally was
+        self.angleListBox.setCurrentRow(row)
+        self.durationListBox.setCurrentRow(row)
+        self.speedListBox.setCurrentRow(row)
+        self.linkApertureListBox.setCurrentRow(row)
 
     #adds new object to the stimulus design
     def addStimObject(self):
@@ -966,25 +1666,27 @@ class App(QMainWindow):
             return
 
         for key,val in stim[index].items():
+            
+            if key in control:    
+                #handle by control type
+                type = control[key].__class__.__name__
+                if type == 'QLineEdit':
+                    control[key].setText(str(val))
 
-            #handle by control type
-            type = control[key].__class__.__name__
-            if type == 'QLineEdit':
-                control[key].setText(str(val))
+                elif type == 'QComboBox':
+                    #which index has the text
+                    items = [control[key].itemText(i) for i in range(control[key].count())]
 
-            elif type == 'QComboBox':
+                    if val == '':
+                        whichItem = 0
+                    else:
+                        whichItem = items.index(val)
 
-                 #which index has the text
-                items = [control[key].itemText(i) for i in range(control[key].count())]
-                if val == '':
-                    whichItem = 0
-                else:
-                    whichItem = items.index(val)
-
-                control[key].setCurrentIndex(whichItem)
-                #flip the controls depending on the drop down menu selection
-                self.flipControls(key,val)
-
+                    control[key].setCurrentIndex(whichItem)
+                    
+                    #flip the controls depending on the drop down menu selection
+                    self.flipControls(key,val)
+                               
 
         #populate the batch list box
         self.batchStimList.clear()
@@ -996,16 +1698,23 @@ class App(QMainWindow):
             sequence = seqAssign[index][key]['sequence']
             if sequence == 'None':
                 #set menu to none if there is no sequence assignment
-                control[key].setCurrentIndex(0)
-                control[key].setStyleSheet("background-color: white")
-                control[key].setStyleSheet("color: black")
+                try:
+                    control[key].setCurrentIndex(0)
+                    control[key].setStyleSheet("background-color: white")
+                    control[key].setStyleSheet("color: black")
+                except:
+                    print('Style sheet error in setObjectParameters function...nonfatal.')
             else:
                 #which item in sequence menu is it?
                 whichItem = seqList.index(sequence)
                 if whichItem == -1:
                     return
-                control[key].setCurrentIndex(whichItem+1)
-                control[key].setStyleSheet("background-color: rgba(150, 245, 150, 150)")
+
+                try:
+                    control[key].setCurrentIndex(whichItem+1)
+                    control[key].setStyleSheet("background-color: rgba(150, 245, 150, 150)")
+                except:
+                    print('Style sheet error in setObjectParameters function...nonfatal.')
 
     #Finds sequence assignments, and displays what they are at the bottom of the GUI
     def displaySeqAssignments(self,objectNum):
@@ -1014,7 +1723,7 @@ class App(QMainWindow):
         for key,_ in seqAssign[objectNum].items():
             sequence = seqAssign[objectNum][key]['sequence']
             if sequence != 'None':
-                seqDisplay.append('[' + str(objectNum) + '] ' + seqAssign[objectNum][key]['parent'] + ': ')
+                seqDisplay.append('[' + str(objectNum) + '] ' + seqAssign[objectNum][key]['parent'] + ' (' + seqAssign[objectNum][key]['sequence'] + ') : ')
                 seqDisplay.append(','.join(seqDict[sequence]) + '\n')
 
         #convert list to string
@@ -1024,20 +1733,23 @@ class App(QMainWindow):
 
     #Changes controls based on object Type
     def flipControls(self,controlName,selection):
-
-        if selection == 'Circle':
+        
+        if selection == 'Circle' and controlName == 'objectType':
+            
             #some object dependent repositioning
             self.designPanelLayout.addWidget(self.angleLabel,9,8)
             self.designPanelLayout.addWidget(self.angle,9,9)
             self.designPanelLayout.addWidget(self.angleSeq,9,10)
-            for key,value in circleSettings.items():
-                if value == 0:
-                    control[key].hide()
+            
+            for theControl in allSettings:
+                if theControl in circleSettings:
+                    control[theControl].show()
                 else:
-                    control[key].show()
+                    control[theControl].hide()
+
             self.flipControls('motionType',self.motionType.currentText())
 
-        elif selection == 'Rectangle':
+        elif selection == 'Rectangle' and controlName == 'objectType':
             #some object dependent repositioning
             self.designPanelLayout.addWidget(self.orientationLabel,9,0)
             self.designPanelLayout.addWidget(self.orientation,9,1)
@@ -1045,14 +1757,23 @@ class App(QMainWindow):
             self.designPanelLayout.addWidget(self.angleLabel,9,8)
             self.designPanelLayout.addWidget(self.angle,9,9)
             self.designPanelLayout.addWidget(self.angleSeq,9,10)
-            for key,value in rectangleSettings.items():
-                if value == 0:
-                    control[key].hide()
-                else:
-                    control[key].show()
-            self.flipControls('motionType',self.motionType.currentText())
+            self.designPanelLayout.addWidget(self.lengthLabel,8,0)
+            self.designPanelLayout.addWidget(self.length,8,1)
+            self.designPanelLayout.addWidget(self.lengthSeq,8,2)
 
-        elif selection == 'Grating':
+            self.designPanelLayout.addWidget(self.widthLabel,7,0)
+            self.designPanelLayout.addWidget(self.width,7,1)
+            self.designPanelLayout.addWidget(self.widthSeq,7,2)
+
+            for theControl in allSettings:
+                if theControl in rectangleSettings:
+                    control[theControl].show()
+                else:
+                    control[theControl].hide()
+
+            self.flipControls('motionType',self.motionType.currentText())
+       
+        elif selection == 'Grating' and controlName == 'objectType':
             #some object dependent repositioning
             self.designPanelLayout.addWidget(self.orientationLabel,10,0)
             self.designPanelLayout.addWidget(self.orientation,10,1)
@@ -1063,42 +1784,78 @@ class App(QMainWindow):
             self.designPanelLayout.addWidget(self.driftFreqLabel,7,8)
             self.designPanelLayout.addWidget(self.driftFreq,7,9)
             self.designPanelLayout.addWidget(self.driftFreqSeq,7,10)
-            for key,value in gratingSettings.items():
-                if value == 0:
-                    control[key].hide()
+            
+            for theControl in allSettings:
+                if theControl in gratingSettings:
+                    control[theControl].show()
                 else:
-                    control[key].show()
+                    control[theControl].hide()
 
             #recursive call to set the motion/drift settings according to object type
             self.flipControls('motionType',self.motionType.currentText())
 
-        elif selection == 'Noise':
+        elif selection == 'Checkerboard' and controlName == 'objectType':
             #some object dependent repositioning
             self.designPanelLayout.addWidget(self.angleLabel,9,8)
             self.designPanelLayout.addWidget(self.angle,9,9)
             self.designPanelLayout.addWidget(self.angleSeq,9,10)
-            for key,value in noiseSettings.items():
-                if value == 0:
-                    control[key].hide()
+
+            for theControl in allSettings:
+                if theControl in checkerboardSettings:
+                    control[theControl].show()
                 else:
-                    control[key].show()
+                    control[theControl].hide()
+
+            #recursive call to set the positional shift type controls for checkerboard noise
+            self.flipControls('PositionalShiftType',self.PositionalShiftType.currentText())
+
             #recursive call to set the motion/drift settings according to object type
             self.flipControls('motionType',self.motionType.currentText())
 
-        elif selection == 'Cloud':
+        elif selection == 'Checkerboard 1D' and controlName == 'objectType':
+        
             #some object dependent repositioning
             self.designPanelLayout.addWidget(self.angleLabel,9,8)
             self.designPanelLayout.addWidget(self.angle,9,9)
             self.designPanelLayout.addWidget(self.angleSeq,9,10)
-            for key,value in cloudSettings.items():
-                if value == 0:
-                    control[key].hide()
+
+            self.designPanelLayout.addWidget(self.lengthLabel,8,0)
+            self.designPanelLayout.addWidget(self.length,8,1)
+            self.designPanelLayout.addWidget(self.lengthSeq,8,2)
+
+            self.designPanelLayout.addWidget(self.widthLabel,9,0)
+            self.designPanelLayout.addWidget(self.width,9,1)
+            self.designPanelLayout.addWidget(self.widthSeq,9,2)
+
+            self.designPanelLayout.addWidget(self.orientationLabel,11,0)
+            self.designPanelLayout.addWidget(self.orientation,11,1)
+            self.designPanelLayout.addWidget(self.orientationSeq,11,2)
+
+            for theControl in allSettings:
+                if theControl in checkerboard1DSettings:
+                    control[theControl].show()
                 else:
-                    control[key].show()
+                    control[theControl].hide()
+
             #recursive call to set the motion/drift settings according to object type
             self.flipControls('motionType',self.motionType.currentText())
 
-        elif selection == 'Windmill':
+        elif selection == 'Cloud' and controlName == 'objectType':
+            #some object dependent repositioning
+            self.designPanelLayout.addWidget(self.angleLabel,9,8)
+            self.designPanelLayout.addWidget(self.angle,9,9)
+            self.designPanelLayout.addWidget(self.angleSeq,9,10)
+
+            for theControl in allSettings:
+                if theControl in cloudSettings:
+                    control[theControl].show()
+                else:
+                    control[theControl].hide()
+
+            #recursive call to set the motion/drift settings according to object type
+            self.flipControls('motionType',self.motionType.currentText())
+
+        elif selection == 'Windmill' and controlName == 'objectType':
             #some object dependent repositioning
             self.designPanelLayout.addWidget(self.orientationLabel,9,0)
             self.designPanelLayout.addWidget(self.orientation,9,1)
@@ -1106,35 +1863,51 @@ class App(QMainWindow):
             self.designPanelLayout.addWidget(self.driftFreqLabel,8,8)
             self.designPanelLayout.addWidget(self.driftFreq,8,9)
             self.designPanelLayout.addWidget(self.driftFreqSeq,8,10)
-            for key,value in windmillSettings.items():
-                if value == 0:
-                    control[key].hide()
+
+            for theControl in allSettings:
+                if theControl in windmillSettings:
+                    control[theControl].show()
                 else:
-                    control[key].show()
+                    control[theControl].hide()
+
             #recursive call to set the motion/drift settings according to object type
             self.flipControls('motionType',self.motionType.currentText())
 
-        elif selection == 'Annulus':
-            for key,value in annulusSettings.items():
-                if value == 0:
-                    control[key].hide()
+        elif selection == 'Annulus' and controlName == 'objectType':
+
+            for theControl in allSettings:
+                if theControl in annulusSettings:
+                    control[theControl].show()
                 else:
-                    control[key].show()
+                    control[theControl].hide()
+
             self.flipControls('motionType',self.motionType.currentText())
 
-        elif selection == 'Image':
+        elif selection == 'Image' and controlName == 'objectType':
             #some object dependent repositioning
             self.designPanelLayout.addWidget(self.angleLabel,9,8)
             self.designPanelLayout.addWidget(self.angle,9,9)
             self.designPanelLayout.addWidget(self.angleSeq,9,10)
-            for key,value in imageSettings.items():
-                if value == 0:
-                    control[key].hide()
+ 
+            for theControl in allSettings:
+                if theControl in imageSettings:
+                    control[theControl].show()
                 else:
-                    control[key].show()
+                    control[theControl].hide()
+
             self.flipControls('motionType',self.motionType.currentText())
 
-        elif selection == 'Batch':
+        elif selection == 'Frames' and controlName == 'objectType':
+ 
+            for theControl in allSettings:
+                if theControl in frameSettings:
+                    control[theControl].show()
+                else:
+                    control[theControl].hide()
+
+            self.flipControls('motionType',self.motionType.currentText())
+
+        elif selection == 'Batch' and controlName == 'objectType':
             index = self.stimBank.currentRow()
 
             self.batchStimMenu.clear()
@@ -1143,103 +1916,206 @@ class App(QMainWindow):
 
             self.stimBank.setCurrentRow(index)
 
-            for key,value in batchSettings.items():
-                if value == 0:
-                    control[key].hide()
+            for theControl in allSettings:
+                if theControl in batchSettings:
+                    control[theControl].show()
                 else:
-                    control[key].show()
+                    control[theControl].hide()
 
-        elif selection == 'Snake':
+        elif selection == 'Snake' and controlName == 'objectType':
             #some object dependent repositioning
             self.designPanelLayout.addWidget(self.angleLabel,9,8)
             self.designPanelLayout.addWidget(self.angle,9,9)
             self.designPanelLayout.addWidget(self.angleSeq,9,10)
-            for key,value in snakeSettings.items():
-                if value == 0:
-                    control[key].hide()
+
+            for theControl in allSettings:
+                if theControl in snakeSettings:
+                    control[theControl].show()
                 else:
-                    control[key].show()
+                    control[theControl].hide()
+
             self.flipControls('motionType',self.motionType.currentText())
 
-        elif selection == 'Static' and controlName == 'motionType':
-            #self.designPanelLayout.addWidget(self.blank5,7,8,4,1)
-            for key,value in staticMotionSettings.items():
-                if value == 0:
-                    control[key].hide()
+        elif selection == 'Random Dot' and controlName == 'objectType':
+            for theControl in allSettings:
+                if theControl in randomDotSettings:
+                    control[theControl].show()
                 else:
-                    control[key].show()
+                    control[theControl].hide()
+            
+            self.flipControls('motionType',self.motionType.currentText())
+     
+        elif selection == 'Static' and controlName == 'motionType':
+            if self.objectType.currentText() == 'Random Dot':
+                for theControl in allMotionSettings:
+                    if theControl in randomDotMotionSettings:
+                        control[theControl].show()
+                    else:
+                        control[theControl].hide()
+            else:
+                for theControl in allMotionSettings:
+                    if theControl in staticMotionSettings:
+                        control[theControl].show()
+                    else:
+                        control[theControl].hide()
 
         elif selection == 'Drift' and controlName == 'motionType':
             #self.designPanelLayout.addWidget(self.blank5,10,8,1,1)
             #Grating and windmill have different options for motion than other stimuli
             if self.objectType.currentText() == 'Grating':
-                for key,value in driftGratingMotionSettings.items():
-                    if value == 0:
-                        control[key].hide()
+                for theControl in allMotionSettings:
+                    if theControl in driftGratingMotionSettings:
+                        control[theControl].show()
                     else:
-                        control[key].show()
+                        control[theControl].hide()
+                        
             elif self.objectType.currentText() == 'Windmill':
-                for key,value in windmillMotionSettings.items():
-                    if value == 0:
-                        control[key].hide()
+                for theControl in allMotionSettings:
+                    if theControl in windmillMotionSettings:
+                        control[theControl].show()
                     else:
-                        control[key].show()
+                        control[theControl].hide()
+            elif self.objectType.currentText() == 'Random Dot':
+                for theControl in allMotionSettings:
+                    if theControl in randomDotMotionSettings:
+                        control[theControl].show()
+                    else:
+                        control[theControl].hide()
             else:
-                for key,value in driftMotionSettings.items():
-                    if value == 0:
-                        control[key].hide()
+                for theControl in allMotionSettings:
+                    if theControl in driftMotionSettings:
+                        control[theControl].show()
                     else:
-                        control[key].show()
+                        control[theControl].hide()
+
+        elif selection == 'Random Walk' and controlName == 'motionType':
+            if self.objectType.currentText() == 'Random Dot':
+                for theControl in allMotionSettings:
+                    if theControl in randomDotMotionSettings:
+                        control[theControl].show()
+                    else:
+                        control[theControl].hide()
+            elif self.objectType.currentText() == 'Grating':
+                for theControl in allMotionSettings:
+                    if theControl in randomWalkGratingMotionSettings:
+                        control[theControl].show()
+                    else:
+                        control[theControl].hide()
+            else:
+                for theControl in allMotionSettings:
+                    if theControl in randomWalkMotionSettings:
+                        control[theControl].show()
+                    else:
+                        control[theControl].hide()
 
         elif selection == 'Static' and controlName == 'modulationType':
-            for key,value in staticModSettings.items():
-                if value == 0:
-                    control[key].hide()
+
+            for theControl in allModulationSettings:
+                if theControl in staticModSettings:
+                    control[theControl].show()
                 else:
-                    control[key].show()
+                    control[theControl].hide()
+
+        elif selection == 'Noise' and controlName == 'modulationType':
+
+            for theControl in allModulationSettings:
+                if theControl in noiseModSettings:
+                    control[theControl].show()
+                else:
+                    control[theControl].hide()
 
         elif selection != 'Static' and controlName == 'modulationType':
-            for key,value in dynamicModSettings.items():
-                if value == 0:
-                    control[key].hide()
+           
+            for theControl in allModulationSettings:
+                if theControl in dynamicModSettings:
+                    control[theControl].show()
                 else:
-                    control[key].show()
-        elif selection == 'Cartesian' and controlName == 'coordinateType':
-            for key,value in cartesianSettings.items():
-                if value == 0:
-                    control[key].hide()
-                else:
-                    control[key].show()
-        elif selection == 'Cartesian' and controlName == 'maskCoordinateType':
-            for key,value in cartesianMaskSettings.items():
-                if value == 0:
-                    control[key].hide()
-                else:
-                    control[key].show()
-        elif selection == 'Polar' and controlName == 'coordinateType':
-            for key,value in polarSettings.items():
-                if value == 0:
-                    control[key].hide()
-                else:
-                    control[key].show()
-        elif selection == 'Polar' and controlName == 'maskCoordinateType':
-            for key,value in polarMaskSettings.items():
-                if value == 0:
-                    control[key].hide()
-                else:
-                    control[key].show()
+                    control[theControl].hide()
 
+        elif selection == 'Cartesian' and controlName == 'coordinateType':
+
+            for theControl in allCoordinateSettings:
+                if theControl in cartesianSettings:
+                    control[theControl].show()
+                else:
+                    control[theControl].hide()
+                    
+        elif selection == 'Polar' and controlName == 'coordinateType':
+
+            for theControl in allCoordinateSettings:
+                if theControl in polarSettings:
+                    control[theControl].show()
+                else:
+                    control[theControl].hide()
+
+        elif selection == 'Cartesian' and controlName == 'maskCoordinateType':
+        
+            for theControl in allCoordinateMaskSettings:
+                if theControl in cartesianMaskSettings:
+                    control[theControl].show()
+                else:
+                    control[theControl].hide()
+
+
+        elif selection == 'Polar' and controlName == 'maskCoordinateType':
+          
+            for theControl in allCoordinateMaskSettings:
+                if theControl in polarMaskSettings:
+                    control[theControl].show()
+                else:
+                    control[theControl].hide()
+
+        elif controlName == 'PositionalShiftType':
+             #Set the positional shift controls
+            if self.PositionalShiftType.currentText() == 'Static':
+                for theControl in allPositionalShiftSettings:
+                    if theControl in staticPositionalShiftSettings:
+                        control[theControl].show()
+                    else:
+                        control[theControl].hide()
+            elif self.PositionalShiftType.currentText() == 'Random':
+                for theControl in allPositionalShiftSettings:
+                    if theControl in randomPositionalShiftSettings:
+                        control[theControl].show()
+                    else:
+                        control[theControl].hide()
+
+        
     #Converts 0-255 range to -1 to 1 range
+    #Does this using gamma correction for whatever gamma table is loaded
     def getBackground(self):
         bgndStr = self.background.text()
+
+        MaxValue = 2**BitDepth - 1
+
         if len(bgndStr) > 0:
             if bgndStr.isnumeric():
-                val = float(self.background.text())
-                bgnd = (2 * val/255.) - 1 #normalize from -1 to 1
+                val = int(self.background.text())
+
+                # if val > 255:
+                #     val = 255
+
+                #12 bit intensity (0-4095) encoding instead of original 8 bit (0-255)
+                if val > MaxValue:
+                    val = MaxValue
+                    self.background.setText(str(MaxValue))
+
+                if val < 0:
+                    val = 0
+
+                gammaCorrectedVal = float(gammaTable[val])
+
+                # bgnd = (2 * gammaCorrectedVal/255.) - 1 #normalize from -1 to 1
+
+                bgnd = (2 * gammaCorrectedVal/float(MaxValue)) - 1 #normalize from -1 to 1
             else:
                 control['background'].setText('0')
-                val = 0.0
-                bgnd = (2 * val/255.) - 1 #normalize from -1 to 1
+                val = float(gammaTable[0])
+
+                bgnd = (2 * val/float(Maxvalue)) - 1 #normalize from -1 to 1
+
+                # bgnd = (2 * val/255.) - 1 #normalize from -1 to 1
+
             return bgnd
         else:
             return
@@ -1251,9 +2127,9 @@ class App(QMainWindow):
             if isOpen == 1:
                 syncSpot.draw()
 
-    #Open a stimulus window
+    #Opens a stimulus window
     def initializeSession(self):
-        global win,isOpen,ifi,main
+        global win,isOpen,ifi
 
         bgnd = self.getBackground()
 
@@ -1270,13 +2146,14 @@ class App(QMainWindow):
             winType = 'pyglet',
             screen = monitor,
             allowGUI = False,
-            gamma = float(self.gammaTable.currentText())
         )
 
+        isOpen = 1 #window is open
 
         #Frame rate
-        ifi = 1/win.getActualFrameRate(10,100)
-        isOpen = 1 #window is open
+        rate = self.measureFrameRate()
+
+        ifi = 1./rate
 
         ppm = float(self.ppm.text())
 
@@ -1294,9 +2171,35 @@ class App(QMainWindow):
         self.drawSyncSpot(syncSpot,-1) #dark sync spot
         win.flip()
 
+    #Closes any open StimGen session
+    def closeStimGenSession(self):
+        global isOpen, win
+        try:
+            win.close()
+            isOpen = 0 #window is open
+        except NameError:
+            return
+
+    #Prints the measured frame rate of the open window to the terminal
+    def measureFrameRate(self):
+        if isOpen:
+            rate = win.getActualFrameRate()
+            print('Frame Rate: ' + str(rate) + ' Hz')
+            return rate
+
     #Fills out the stimulus parameters into a structure
-    def runStim(self):
-        global runTime,stimID
+    def runStim(self,exportStimulus):
+        global runTime,stimID, NI_FLAG,cloudArray,trajSegments
+
+        #sets random number generator seed
+        seed(1)
+
+        #Blocks stimulus runs if the centering calibration is active
+        # if centeringActive == 1:
+            # return
+
+        #If exportStimulus is set, the stimulus will run but not be presented,
+        #and the frames will be exported as a bitmap file.
 
         originalStimulus = self.stimBank.currentItem()
         # index = self.stimBank.currentRow()
@@ -1311,6 +2214,11 @@ class App(QMainWindow):
             isBatch = 0
             numBatchStimuli = 1
             stimList = [originalStimName]
+
+        if stim[0]['objectType'] == 'Frames':
+            isFrameStimulus = 1
+        else:
+            isFrameStimulus = 0
 
         if numBatchStimuli == 0:
             return #abort stimulus if none were defined
@@ -1331,6 +2239,15 @@ class App(QMainWindow):
             #stim dictionary holds the parameters for all the objects
             numObjects = len(stim)
 
+            #trajectory segment timing dictionary
+            trajSegments = {}
+            for object in range(numObjects):
+                trajSegments[object] = {
+                'numSegments':0,
+                'segments':{},
+                'startFrame':{}
+                }
+            
             #global parameters
             ppm = float(self.ppm.text())
             xOffset = int(self.xOffset.text())
@@ -1360,6 +2277,12 @@ class App(QMainWindow):
             #runTime dictionary is created here, and will hold parameters
             #calculated at run time for each object
             runTime = {}
+
+            #holds any motion cloud image arrays that are defined
+            cloudArray = {}
+            
+            randomAngles = {}
+
             #Timer dictionaries
             timer = {}
 
@@ -1375,6 +2298,8 @@ class App(QMainWindow):
                 )
                 aperture.enabled = True
 
+            
+                
             #parallel port address
             # port = parallel.ParallelPort(address=0x0378)
             # print(port)
@@ -1389,6 +2314,7 @@ class App(QMainWindow):
                 'startY':0,
                 'halfCycle':0,
                 'cycleCount':1,
+                'noiseCycle':0,
                 'phase':0,
                 'driftIncrement':0,
                 'firstIntensity':0,
@@ -1400,9 +2326,18 @@ class App(QMainWindow):
                     'startFrame':[],
                     'finalX':[],
                     'finalY':[]
-                }
+                },
+                'randomWalkAngle':0,
+                'randomWalkInterval':0,
+                'randomWalkFrameCount':0
                 }
 
+                #set up array of potential motion clouds for each object
+                cloudArray[i] = {
+                'MotionCloud':[]
+                }
+
+                
                 timer[i] = 0
 
             #start at 0 sweeps
@@ -1410,16 +2345,31 @@ class App(QMainWindow):
 
             #check for sequence assignments to get the total number of sweeps
             for i in range(numObjects):
+
                 for key,_ in seqAssign[i].items():
                     sequence = seqAssign[i][key]['sequence']
+                    
+                    numSweepsTemp = 0
+                    
                     if sequence != 'None':
                         #extract sequence entry
                         entry = seqDict[sequence]
-
-                        #size of entry
-                        size = len(entry)
-                        if size > numSweeps:
-                            numSweeps = size
+                        
+                        #determine if the sequence entry is an expression or a list of values
+                        for subEntry in entry:
+                            SeqType = self.CheckSequenceType(subEntry)
+                        
+                            if SeqType == 'Expression':
+                                numSweepsTemp += self.SeqExpressionLen(subEntry)
+                            else:
+                                numSweepsTemp += 1
+                                # #size of entry
+                                # size = len(entry)
+                                # if size > numSweeps:
+                                #     numSweeps = size
+                            
+                        if(numSweepsTemp > numSweeps):
+                            numSweeps = numSweepsTemp
 
                 #if trajectory, check if it contains sequences and add them to the sweep count
                 if stim[i]['trajectory'] != 'None':
@@ -1448,30 +2398,57 @@ class App(QMainWindow):
                 #frame duration for each object
                 runTime[i]['frames'] = int(round(stim[i]['duration']/ifi)) #round to nearest integer
 
-            #What is the total duration of the stimulus, including delays?
-            durList = []
-            durList = [runTime[i]['delayFrames'] + runTime[i]['frames'] for i in range(numObjects)]
-            totalDuration = max(durList)
+            # #What is the total duration of the stimulus, including delays?
+            # durList = []
+            # durList = [runTime[i]['delayFrames'] + runTime[i]['frames'] for i in range(numObjects)]
+            # totalDuration = max(durList)
 
             #if no sequences are assigned or they are all empty, set sweeps to 1
             if numSweeps == 0:
                 numSweeps = 1
 
+            #new list for trigger timestamps
+            triggerTimeStamps = []
+            objectTimeStamps = []
+
+            #Set up frame time stamp recorder
+            frameTimeStamps = np.zeros((1,numSweeps*repeats))
+            
             #STIMULUS LOOP #Loop through repeats
             for repeat in range(repeats): #use repeat setting for first object
 
                 #loop through sweeps from sequence assignments
                 for sweep in range(numSweeps):
 
+                    #ensures consistent seeds for each sweep
+                    seed(1)
+
+                    #Instantiate a new random number generator and a second one for parallel use
+                    #I'm using the second number generator in the noise stimulus, so that the same sequence of noise occurs
+                    #whether I'm implementing random positional shifts or not. The positional shifts also use randomization,
+                    #so I need to use a different number generator instance to avoid disrupting the pixel noise sequence.
+
+                    rng = np.random.default_rng(1)
+
                     #check for abort click
                     if abortStatus:
+                        self.stimCountDown.setText('')
+                        self.sweepMonitor.setText('')
                         return
+
+                    #writes the stimulus to an HDF5 file for retrieval by ScanImage and WaveSurfer/Turntable through the ethernet port
+                    writeHDF5(stim,seqAssign,seqDict,trajDict,maskDict,originalStimName)
 
                     #reset frame counts
                     frameCount = 0
 
+                    #keeps track of motion clouds, for random walk coordination
+                    firstCloud = -1
+                    randomAngleCount = np.zeros(numObjects,dtype=np.int8)
+
                     #check for sequence assignments and fill runtime dictionary
                     for i in range(numObjects):
+                        
                         for key,_ in seqAssign[i].items():
                             sequence = seqAssign[i][key]['sequence']
                             if sequence != 'None':
@@ -1479,8 +2456,17 @@ class App(QMainWindow):
                                 entry = seqDict[sequence]
                                 #parent control name
                                 parent = seqAssign[i][key]['parent']
-                                #insert sequence variable into the stim dictionary for each sweep
-                                stim[i][parent] = float(entry[sweep])
+
+                                #is this sequence an expression or a list of values?
+                               #determine if the sequence entry is an expression or a list of values
+                                # SeqType = self.CheckSequenceType(entry)
+                                
+                                # if SeqType == 'Expression':
+                                #print(self.resolveSeqExpression(entry,sweep))
+                                stim[i][parent] = self.resolveSeqExpression(entry,sweep)
+                                # else:
+                                #     #insert sequence variable into the stim dictionary for each sweep
+                                #     stim[i][parent] = float(entry[sweep])
 
                         #Set runTime dictionary for each sweeps
                         #piggy backs off the seqAssign loop, which also iterates through the objects
@@ -1491,9 +2477,28 @@ class App(QMainWindow):
                         #frame duration for each object
                         runTime[i]['frames'] = int(round(stim[i]['duration']/ifi)) #round to nearest integer
 
+                        #What is the total duration of the stimulus, including delays?
+                        durList = []
+                        durList = [runTime[i]['delayFrames'] + runTime[i]['frames'] for i in range(numObjects)]
+                        totalDuration = max(durList)
+
+                       
+                        #array of random angles that may be used for random walk stimuli
+                        randomAngles[i] = {
+                            'angles': np.zeros(totalDuration+1)
+                        }
+
+
                         #starting positions of each object
-                        runTime[i]['startX'] = ppm * (xOffset + stim[i]['xPos']) + ppm * stim[i]['startRad'] * np.cos(stim[i]['angle'] * np.pi/180.)
-                        runTime[i]['startY'] = ppm * (yOffset + stim[i]['yPos']) + ppm * stim[i]['startRad'] * np.sin(stim[i]['angle'] * np.pi/180.)
+                        if stim[i]['coordinateType'] == 'Cartesian':
+                            xPos = stim[i]['xPos']
+                            yPos = stim[i]['yPos']
+                        elif stim[i]['coordinateType'] == 'Polar':
+                            xPos = stim[i]['polarRadius'] * np.cos(stim[i]['polarAngle'] * np.pi/180.)
+                            yPos = stim[i]['polarRadius'] * np.sin(stim[i]['polarAngle'] * np.pi/180.)
+                            
+                        runTime[i]['startX'] = ppm * (xOffset + xPos) + ppm * stim[i]['startRad'] * np.cos(stim[i]['angle'] * np.pi/180.)
+                        runTime[i]['startY'] = ppm * (yOffset + yPos) + ppm * stim[i]['startRad'] * np.sin(stim[i]['angle'] * np.pi/180.)
 
                         #Motion parameters
                         if stim[i]['motionType'] == 'Drift':
@@ -1501,6 +2506,11 @@ class App(QMainWindow):
                             runTime[i]['driftIncrement'] =  stim[i]['driftFreq'] * ifi
                                     # elif stim[i]['objectType'] == 'Windmill':
                                     #   runTime[i]['driftIncrement'] = stim[i]['driftFreq'] * ifi
+                        elif stim[i]['motionType'] == 'Random Walk':
+                            runTime[i]['randomWalkInterval'] =  round((1. / stim[i]['walkFreq']) / ifi)
+                            runTime[i]['randomWalkFrameCount'] = 0
+                            runTime[i]['driftIncrement'] =  stim[i]['driftFreq'] * ifi
+                            
 
                         #Modulation parameters
                         if (stim[i]['modulationType'] == 'Square') or (stim[i]['modulationType'] == 'Sine'):
@@ -1508,15 +2518,21 @@ class App(QMainWindow):
                             runTime[i]['cycleCount'] = 1
 
                         elif stim[i]['modulationType'] == 'Chirp':
-                            chirpWave = self.buildChirp(i,ifi)
+                            if stim[i]['objectType'] == 'Grating':
+                                chirpWave = self.buildChirp(i,ifi,0) #not gamma corrected, this will occur when the grating is calculated
+                            else:
+                                chirpWave = self.buildChirp(i,ifi,1) #gamma corrected for all other objects
+
                             #make sure total duration matches frame number if the stimulus is a chirp
                             stim[i]['contrast'] = 100
                             totalDuration = chirpWave.shape[0]
                             runTime[i]['frames'] = totalDuration
 
                         #noise frames per cycle
-                        if stim[i]['objectType'] == 'Noise':
-                            runTime[i]['halfCycle'] = int(round((0.5/stim[i]['noiseFreq'])/ifi)) # number of frames per half cycle
+                        if stim[i]['objectType'] == 'Checkerboard' or stim[i]['objectType'] == 'Checkerboard 1D':
+                            # runTime[i]['halfCycle'] = int(round((0.5/stim[i]['modulationFreq'])/ifi)) # number of frames per half cycle
+                            runTime[i]['noiseCycle'] = int(round((1/stim[i]['modulationFreq']) / ifi)) # number of frames per half cycle
+
                             runTime[i]['cycleCount'] = 1
 
                         runTime[i]['phase'] = stim[i]['spatialPhase'] / 360.
@@ -1526,8 +2542,44 @@ class App(QMainWindow):
                         runTime[i]['firstIntensity'] = firstIntensity
                         runTime[i]['secondIntensity'] = secondIntensity
 
+                        
                         #Define stimulus
                         runTime[i]['stimulus'] = self.defineStimulus(runTime,ppm,xOffset,yOffset,i,ifi,sweep)
+
+                        #setup the initial frame of the motion cloud stimulus
+                        # motionCloud = cloudArray[i]['MotionCloud']
+
+                        if stim[i]['objectType'] == 'Cloud':
+                            #polar coordinates or cartesian coordinates?
+                            if stim[i]['coordinateType'] == 'Cartesian':
+                                xPos = stim[i]['xPos']
+                                yPos = stim[i]['yPos']
+                            elif stim[i]['coordinateType'] == 'Polar':
+                                xPos = stim[i]['polarRadius'] * np.cos(stim[i]['polarAngle'] * np.pi/180.)
+                                yPos = stim[i]['polarRadius'] * np.sin(stim[i]['polarAngle'] * np.pi/180.)
+
+                            #initialize a cloud aperture at the origin
+                            cloudAperture = visual.Aperture(
+                                win = win,
+                                units = 'pix',
+                                shape = 'circle',
+                                size = stim[i]['objectAperture'] * ppm,
+                                inverted = False,
+                                pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
+                                )
+
+
+                            stimulus = visual.ImageStim(
+                                win=win,
+                                units = 'pix',
+                                image = cloudArray[i]['MotionCloud'][:,:,0],
+                                size = (1280,800),
+                                # ori = stim[i]['cloudOrient'],
+                                pos = ((xOffset) * ppm,(yOffset) * ppm)
+                                )
+                            runTime[i]['stimulus'] = stimulus
+
+                            
 
                         #reset stimulus frame counts
                         runTime[i]['stimFrame'] = 0
@@ -1536,68 +2588,184 @@ class App(QMainWindow):
 
                         #calculate trajectory frames
                         if stim[i]['trajectory'] != 'None':
+                            #sets random number generator seed. Ensures that random walk trajectories are identical to
+                            #those defined by standard motion random walk earlier in the code.
+                            seed(1) 
+
                             self.calculateTrajectory(stim[i]['trajectory'],i,sweep,ifi,ppm,xOffset,yOffset)
                             runTime[i]['frames'] = len(trajectoryStim[i]['yPos'])
 
+                        #Create an array that holds random walk angles for each object.
+                        #This is for potential random walk stimuli, and just ensures consistent seeding across objects
+                        seed(1)
+                        randomAngles[i]['angles'] = [randint(0,360) for _ in range(totalDuration + 1)]
+
+                        #If the object in question is a grating, fix the random angles to be +/- along the axis of motion
+                        if stim[i]['objectType'] == 'Grating':
+                            randomAngles[i]['angles'] = [1 if v < 180 else -1 for v in randomAngles[i]['angles']]
 
                     #define the masks/aperture
                     if stim[0]['apertureStatus'] == 'On':
+
+                        if stim[i]['coordinateType'] == 'Cartesian':
+                            xPos = stim[i]['xPos']
+                            yPos = stim[i]['yPos']
+                        elif stim[i]['coordinateType'] == 'Polar':
+                            xPos = stim[i]['polarRadius'] * np.cos(stim[i]['polarAngle'] * np.pi/180.)
+                            yPos = stim[i]['polarRadius'] * np.sin(stim[i]['polarAngle'] * np.pi/180.)
+                            
                         aperture = visual.Aperture(
                         win = win,
                         units = 'pix',
                         shape = 'circle',
                         size = stim[0]['apertureDiam'] * ppm,
                         inverted = False,
-                        pos = (xOffset * ppm,yOffset * ppm)
+
+                        #offset of the aperture follows the local offset of the stimulus object
+                        pos = ((xOffset + xPos)* ppm,(yOffset + yPos) * ppm)
+
+                        #offset of the aperture only obeys global offset, not local offset
+                        # pos = ((xOffset)* ppm,(yOffset) * ppm)
                         )
                         aperture.enabled = True
 
+                    frameTimeStamps = np.resize(frameTimeStamps,(totalDuration,numSweeps*repeats))
 
-                    #Wait for trigger
-                    if self.trigger.currentText() == 'Wait For Trigger':
-                        with ni.Task() as task:
-                            task.di_channels.add_di_chan('PCI6036/port0/line0')
-                            trigger = False
-                            while trigger == False:
-                                #read digital input P0.0 from the ephys board
-                                trigger = task.read()
-                    elif self.trigger.currentText() == 'Send Trigger':
-                        with ni.Task() as task:
-                            #send digital pulse through P0.0 from the ephys board
-                            task.do_channels.add_do_chan('PCI6036/port0/line0')
-                            task.write(False)
-                            task.write(True)
-                            task.write(False)
+                    #Which trigger interface is it?
+                    if globalSettings['triggerInterface'] == 'Parallel Port':
+                        
+                        portAddress = globalSettings['parallelPortAddress']
+                        port = parallel.ParallelPort(address = portAddress)
+                        inputPin = globalSettings['digitalIn']
+                        outputPin = globalSettings['digitalOut']
 
+                        if port:
+
+                            #Wait for parallel port input trigger
+                            if self.trigger.currentText() == 'Wait For Trigger':
+                                self.stimCountDown.setText('Waiting...')
+                                self.stimCountDown.repaint()
+
+                                port.setPin(inputPin,0) #set the pin low
+                                # port.setPin(2,0) #set the pin low
+                                triggerStatus = False
+                                while triggerStatus == False:
+                                    #keep reading the pin to check for trigger
+                                    triggerStatus = port.readPin(inputPin)
+
+                                #trigger recieved
+                                triggerTime = time()
+                                if repeat == 0 and sweep == 0:
+                                    startTime = triggerTime
+
+                            elif self.trigger.currentText() == 'Send Trigger':
+                                #Send parallel port output trigger
+                                (interface,digitalOut,digitalIn,portAddress) = self.getTriggerSettings()
+                                triggerTime = self.sendTTLPulse(interface,digitalOut,digitalIn,portAddress)
+
+                                if repeat == 0 and sweep == 0:
+                                    startTime = triggerTime
+
+                            else:
+                                #No trigger selected
+                                triggerTime = time()
+                                
+                                if repeat == 0 and sweep == 0:
+                                    startTime = triggerTime
+
+                            #Trigger sent, received, or no trigger (restarting stimulus loop)
+                            triggerTimeStamps.append(triggerTime - startTime)
+                        else:
+                            print('Parallel port cannot be found, trigger cannot be sent.')
+                            self.stimCountDown.setText('')
+                            self.sweepMonitor.setText('')
+
+                            triggerTime = time()
+                            if repeat == 0 and sweep == 0:
+                                    startTime = triggerTime
+                            
+                            #Trigger sent, received, or no trigger (restarting stimulus loop)
+                            triggerTimeStamps.append(triggerTime - startTime)
+
+                    elif globalSettings['triggerInterface'] == 'Nidaq Board':
+                        if NI_FLAG:
+                            digitalIn = globalSettings['digitalIn']
+                            digitalOut = globalSettings['digitalOut']
+
+                            if self.trigger.currentText() == 'Wait For Trigger':
+
+                                if digitalIn:
+                                    self.stimCountDown.setText('Waiting...')
+                                    self.stimCountDown.repaint()
+                                    #Wait for input trigger from a Nidaq digital input
+                                    with ni.Task() as task:
+                                        task.di_channels.add_di_chan(digitalIn)
+                                        triggerStatus = False
+                                        while triggerStatus == False:
+                                            #read digital input P0.0 from the ephys board
+                                            triggerStatus = task.read()
+                                        # self.stimCountDown.setText('')
+                                else:
+                                    print("No digital input defined, couldn't wait for trigger")
+                                    return
+                        
+                            elif self.trigger.currentText() == 'Send Trigger':
+                                if digitalOut:
+                                    #Send output trigger from a Nidaq digital out
+                                    with ni.Task() as task:
+                                        task.do_channels.add_do_chan(digitalOut)
+                                        task.write(False)
+                                        task.write(True)
+                                        task.write(False)
+                        else:
+                            if repeat == 0 and sweep == 0:
+                                startTime = time()
+                            continue
+                    
+                    writeTimestamps('Triggers',triggerTimeStamps)
 
                     #overall timer that is started before delay
                     totalTimer = 0
                     totalTimer = core.Clock()
 
+                    objectON = 0
+                    onTime = 0
+
                     #loop through total stimulus duration
                     for frame in range(totalDuration):
+                        #display the timer
+                        self.stimCountDown.setText("%.2f" % (totalTimer.getTime()))
+                        self.sweepMonitor.setText(str(sweep + 1) + '/' + str(numSweeps))
 
                         #flip sync spot to dark as default
                         self.drawSyncSpot(syncSpot,-1)
 
                         #Loop through each object
                         for i in range(numObjects):
-
+                            
                             #extract stimulus intensity so you only do it once per object
                             firstIntensity = runTime[i]['firstIntensity']
                             secondIntensity = runTime[i]['secondIntensity']
+                            
+                            #Only check delay status if this isn't a .bmp frame stimulus,
+                            #which already has the delays and duration built into it.
+                            if isFrameStimulus == 0:
+                                #delay
+                                if frame < runTime[i]['delayFrames']:
+                                    continue
 
-                            #delay
-                            if frame < runTime[i]['delayFrames']:
-                                continue
+                                #duration
+                                if frame >= runTime[i]['delayFrames'] + runTime[i]['frames']:
+                                    continue
 
-                            #duration
-                            if frame >= runTime[i]['delayFrames'] + runTime[i]['frames']:
-                                continue
-
-
+                            
                             #sync spot bright
                             self.drawSyncSpot(syncSpot,1)
+
+                            #timestamp the object turning on
+                            if objectON == 0:
+                                objectON = 1
+                                
 
                             #start timer only on first frame of the stimulus
                             # if runTime[i]['stimFrame'] == 0:
@@ -1609,32 +2777,117 @@ class App(QMainWindow):
                                 #Flip the window to background again
                                 self.drawSyncSpot(syncSpot,-1)
                                 win.flip()
+                                self.stimCountDown.setText('')
+                                self.sweepMonitor.setText('')
                                 return
 
                             #Update stimulus parameters and Draw each stimulus object to the buffer window
 
                             #MOTION CLOUD STIMULI
                             if stim[i]['objectType'] == 'Cloud':
-                                #get the motion cloud frame
+                                #get the motion cloud frame, depends on if it's a random walk motion or not. Random walk uses the same frame over and over
+                                #at different x,y positions.
+                                
+                                if stim[i]['trajectory'] != 'None':
+                                    runTime[i]['stimulus'].pos = self.getTrajectoryPosition(i,ifi,ppm)
+                                    
+                                elif stim[i]['motionType'] == "Random Walk":
+                                    if firstCloud == -1:
+                                        firstCloud = i
 
+                                    if runTime[i]['randomWalkFrameCount'] > runTime[i]['randomWalkInterval']:
+                                        runTime[i]['randomWalkFrameCount'] = 0
+
+                                        #random angle between 0 and 360 degrees
+                                        runTime[i]['randomWalkAngle'] = randomAngles[i]['angles'][randomAngleCount[i]]
+                                        randomAngleCount[i] = randomAngleCount[i] + 1
+
+                                        # runTime[i]['randomWalkAngle'] = randint(0,360)
+                                        # print(runTime[i]['randomWalkAngle'])
+
+                                    #coordinates the jitter for all motion clouds:
+                                    #sets the walk angle to be the same as that of the first cloud definition
+                                    #if only 1 cloud is defined, this will do nothing
+                                    runTime[i]['randomWalkAngle'] = runTime[firstCloud]['randomWalkAngle']
+
+                                    #increments the position of the stimulus according to the new angle
+                                    x = ppm * stim[i]['speed'] * ifi * np.cos(runTime[i]['randomWalkAngle'] * np.pi/180)
+                                    y = ppm * stim[i]['speed'] * ifi * np.sin(runTime[i]['randomWalkAngle'] * np.pi/180)
+
+                                    #boundary conditions, reverse direction if stimulus begins to overrun the boundary (150 um from center)
+                                    if runTime[i]['stimulus'].pos[0] + x > 150 or runTime[i]['stimulus'].pos[0] + x < -150:
+                                        x = -x
+                                        
+                                    
+                                    if runTime[i]['stimulus'].pos[1] + y > 150 or runTime[i]['stimulus'].pos[1] + y < -150:
+                                        y = -y
+
+                                    runTime[i]['stimulus'].pos += (x,y)
+                                    
+                                    runTime[i]['randomWalkFrameCount'] += 1
+                                else:    
+                                    runTime[i]['stimulus'].image = cloudArray[i]['MotionCloud'][:,:,runTime[i]['stimFrame']]
+                                    # motionCloud = cloudArray[i]['MotionCloud']
+                                    # stimulus = visual.ImageStim(
+                                    #     win=win,
+                                    #     units = 'pix',
+                                    #     # image = motionCloud[:,:,runTime[i]['stimFrame']],
+                                    #     image = cloudArray[i]['MotionCloud'][:,:,runTime[i]['stimFrame']],
+                                    #     size = (1280,800),
+                                    #     # ori = stim[i]['cloudOrient'],
+                                    #     pos = ((xOffset + stim[i]['xPos']) * ppm,(yOffset + stim[i]['yPos']) * ppm)
+                                    #     )
+
+                                # runTime[i]['stimulus'] = stimulus
+
+                            #BMP FRAME STIMULUS
+                            elif stim[i]['objectType'] == 'Frames':
                                 stimulus = visual.ImageStim(
                                     win=win,
                                     units = 'pix',
-                                    image = motionCloud[:,:,runTime[i]['stimFrame']],
-                                    size = (1024,768),
-                                    ori = stim[i]['orientation'],
-                                    pos = ((xOffset + stim[i]['xPos']) * ppm,(yOffset + stim[i]['yPos']) * ppm)
+                                    image = stimFrames[frame],
+                                    size = (1280,800),
+                                    ori = 0,
+                                    pos = (0,0)
                                     )
 
                                 runTime[i]['stimulus'] = stimulus
 
+
                             #NOISE STIMULI
-                            elif stim[i]['objectType'] == 'Noise':
+                            elif stim[i]['objectType'] == 'Checkerboard' or stim[i]['objectType'] == 'Checkerboard 1D':
                                 #Flip the intensities between light/dark at each cycle
-                                if runTime[i]['stimFrame'] == runTime[i]['halfCycle'] * runTime[i]['cycleCount']:
-                                    #if number of cycles divided by 2 is an even number we need to update the parameters
-                                    if (runTime[i]['cycleCount'] % 2) == 0:
-                                        runTime[i]['stimulus'].updateNoise()
+
+                                if runTime[i]['stimFrame'] == runTime[i]['noiseCycle'] * runTime[i]['cycleCount']:
+                                    #Add random positional shifts
+
+                                    #Target resolution is the multiple of the noise pixel size for the final STA.
+                                    #For 100 micron noise pixels, targetresolution = 2 will yield 50 micron shifts in X and Y
+                                    #and targetresolution = 4 will yield 25 micron shifts (up to 75 microns)
+                                    if stim[i]['objectType'] == 'Checkerboard' and stim[i]['PositionalShiftType'] == 'Random':
+
+                                        targetResolution = stim[i]['noiseSize'] / stim[i]['TargetResolution'] #integer multiple of the noise pixel size
+
+                                        baselineShift = stim[i]['TargetResolution'] * ppm
+
+                                        #Uses instantiated random number generator, which is independent of the one used
+                                        #by the buildNoise and updateNoise methods in psychopy. This allows the same noise pixel
+                                        #sequence to be driven both with or without random positional shifts.
+
+                                        multiplier = rng.integers(-targetResolution+1,targetResolution) #low inclusive, high excluded
+                                        xShift = multiplier * baselineShift
+                                        
+                                        multiplier = rng.integers(-targetResolution+1,targetResolution) #low inclusive, high excluded
+                                        yShift = multiplier * baselineShift
+
+                                        #the positional shifts operate around the origin position, 
+                                        #so there won't be any random walk away from the origin over time
+                                        xPosition = (xOffset + xPos) * ppm + xShift
+                                        yPosition = (yOffset + yPos) * ppm + yShift
+
+                                        runTime[i]['stimulus'].pos = (xPosition,yPosition)
+
+                                    runTime[i]['stimulus'].updateNoise()
                                     runTime[i]['cycleCount'] = runTime[i]['cycleCount'] + 1 #counts which modulation cycle it's on
 
                             elif stim[i]['objectType'] == 'Snake':
@@ -1657,6 +2910,7 @@ class App(QMainWindow):
                                         else:
                                             currentSegment = 0
 
+                                    
                                     snakeStim[i]['segments'][currentSegment].pos = self.getTrajectoryPosition(i,ifi,ppm)
                                     snakeStim[i]['segments'][currentSegment].width = (stim[i]['width'] + stim[i]['speed'] * ((runTime[i]['stimFrame'] - snakeStim[i]['startFrame'][currentSegment]) * ifi)) * ppm
                                     # runTime[i]['stimulus'].pos = (x,y)
@@ -1678,38 +2932,111 @@ class App(QMainWindow):
                                             runTime[i]['stimulus'].setOri(stim[i]['orientation'] - runTime[i]['driftIncrement'] * runTime[i]['stimFrame'])
                                     else:
                                         if stim[i]['trajectory'] == 'None':
-
-                                            x = runTime[i]['startX'] + ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.cos(stim[i]['angle'] * np.pi/180)
-                                            y = runTime[i]['startY'] + ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.sin(stim[i]['angle'] * np.pi/180)
-                                            runTime[i]['stimulus'].setPos((x,y))
-
+                                            if stim[i]['objectType'] != 'Random Dot':
+                                                x = runTime[i]['startX'] + ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.cos(stim[i]['angle'] * np.pi/180)
+                                                y = runTime[i]['startY'] + ppm * stim[i]['speed'] * (runTime[i]['stimFrame'] * ifi) * np.sin(stim[i]['angle'] * np.pi/180)
+                                                runTime[i]['stimulus'].setPos((x,y))
                                         else:
                                             runTime[i]['stimulus'].pos = self.getTrajectoryPosition(i,ifi,ppm)
+                                
+                                elif stim[i]['motionType'] == 'Random Walk':
+                                    #ignores the random walk fro gratings and windmills motion for now. Will update in later version.
+                                    # if stim[i]['objectType'] == 'Grating':
+                                    #     runTime[i]['stimulus'].phase = runTime[i]['phase'] + runTime[i]['driftIncrement'] * runTime[i]['stimFrame']
+                                    if stim[i]['objectType'] == 'Windmill':
+                                        if stim[i]['turnDirection'] == 'Clockwise':
+                                            runTime[i]['stimulus'].setOri(stim[i]['orientation'] + runTime[i]['driftIncrement'] * runTime[i]['stimFrame'])
+                                        elif stim[i]['turnDirection'] == 'Counterclockwise':
+                                            runTime[i]['stimulus'].setOri(stim[i]['orientation'] - runTime[i]['driftIncrement'] * runTime[i]['stimFrame'])
+                                    else:
+                                        #ignores all trajectories if random walk is selected
+
+                                        if runTime[i]['randomWalkFrameCount'] > runTime[i]['randomWalkInterval']:
+                                            runTime[i]['randomWalkFrameCount'] = 0
+                                            
+                                            #random angle between 0 and 360 degrees
+                                            # runTime[i]['randomWalkAngle'] = randint(0,360)
+                                            runTime[i]['randomWalkAngle'] = randomAngles[i]['angles'][randomAngleCount[i]]
+                                            randomAngleCount[i] = randomAngleCount[i] + 1
+                                            
+                                        if stim[i]['objectType'] == 'Grating':
+                                            #this will happen on first cycle before an update, start the motion in the original direction
+                                            if runTime[i]['randomWalkAngle'] == 0:
+                                                runTime[i]['randomWalkAngle'] = 1
+                                            runTime[i]['stimulus'].phase += runTime[i]['phase'] + runTime[i]['randomWalkAngle'] * runTime[i]['driftIncrement']
+                                        else:
+                                            #increments the position of the stimulus according to the new angle
+                                            x = ppm * stim[i]['speed'] * ifi * np.cos(runTime[i]['randomWalkAngle'] * np.pi/180)
+                                            y = ppm * stim[i]['speed'] * ifi * np.sin(runTime[i]['randomWalkAngle'] * np.pi/180)
+                                        
+
+                                        if stim[i]['objectType'] == 'Grating':
+                                            pass
+                                        else:
+                                            if runTime[i]['stimulus'].pos[0] - runTime[i]['startX'] + x > 75 or runTime[i]['stimulus'].pos[0] - runTime[i]['startX'] + x < -75:
+                                                x = -x
+                                        
+                                            if runTime[i]['stimulus'].pos[1] - runTime[i]['startY'] + y > 75 or runTime[i]['stimulus'].pos[1] - runTime[i]['startY'] + y < -75:
+                                                y = -y
+
+                                            runTime[i]['stimulus'].pos += (x,y)
+                                       
+
+                                        runTime[i]['randomWalkFrameCount'] += 1
 
                                 #Update intensity for modulated stimuli
 
                                 if stim[i]['modulationType'] == 'Square':
                                     #Flip the intensities between light/dark at each cycle
                                     if runTime[i]['stimFrame'] == runTime[i]['halfCycle'] * runTime[i]['cycleCount']:
-
+                                        
                                         if (runTime[i]['cycleCount'] % 2) == 0:
-                                            runTime[i]['stimulus'].contrast = firstIntensity
+                                            if stim[i]['objectType'] == 'Grating':
+                                                gratingArray = self.CalculateGrating(i,1,stim[i]['contrast'])
+                                                runTime[i]['stimulus'].tex = gratingArray
+                                            else:
+                                                runTime[i]['stimulus'].contrast = runTime[i]['firstIntensity']
+                                             
                                         else:
-                                            runTime[i]['stimulus'].contrast = secondIntensity
-
+                                            if stim[i]['objectType'] == 'Grating':
+                                                gratingArray = self.CalculateGrating(i,-1,stim[i]['contrast'])
+                                                runTime[i]['stimulus'].tex = gratingArray
+                                            else:
+                                                runTime[i]['stimulus'].contrast = runTime[i]['secondIntensity']
+                                        
                                         runTime[i]['cycleCount'] = runTime[i]['cycleCount'] + 1 #counts which modulation cycle it's on
-
                                 elif stim[i]['modulationType'] == 'Sine':
                                     #out of bounds intensities
-                                    if firstIntensity - bgnd > 1:
-                                        firstIntensity = bgnd + 1
-                                    elif firstIntensity - bgnd < -1:
-                                        firstIntensity = bgnd - 1
+                                    if stim[i]['objectType'] == 'Grating':
+                                        
+                                        contrastScale = (stim[i]['contrast']) * np.sin(2 * np.pi * stim[i]['modulationFreq'] * (runTime[i]['stimFrame'] * ifi))
+                                        gratingArray = self.CalculateGrating(i,1,contrastScale)
+                                        runTime[i]['stimulus'].tex = gratingArray
 
-                                    runTime[i]['stimulus'].contrast = (stim[i]['contrast']/100.0) * np.sin(2 * np.pi * stim[i]['modulationFreq'] * (runTime[i]['stimFrame'] * ifi))
+                                        #  #Flip the intensities between light/dark at each cycle
+                                        # if runTime[i]['stimFrame'] == runTime[i]['halfCycle'] * runTime[i]['cycleCount']:
+                                        #     if (runTime[i]['cycleCount'] % 2) == 0:
+                                        #         gratingArray = self.CalculateGrating(i,1)
+                                        #         runTime[i]['stimulus'].tex = gratingArray
+                                        #     else:
+                                        #         gratingArray = self.CalculateGrating(i,-1)
+                                        #         runTime[i]['stimulus'].tex = gratingArray
+                                        #     runTime[i]['cycleCount'] = runTime[i]['cycleCount'] + 1 #counts which modulation cycle it's on
+                                    else:
+                                        if firstIntensity - bgnd > 1:
+                                            firstIntensity = bgnd + 1
+                                        elif firstIntensity - bgnd < -1:
+                                            firstIntensity = bgnd - 1
+
+                                        runTime[i]['stimulus'].contrast = (stim[i]['contrast']/100.0) * np.sin(2 * np.pi * stim[i]['modulationFreq'] * (runTime[i]['stimFrame'] * ifi))
 
                                 elif stim[i]['modulationType'] == 'Chirp':
-                                    runTime[i]['stimulus'].contrast = chirpWave[runTime[i]['stimFrame']]
+                                    if stim[i]['objectType'] == 'Grating':
+                                        contrastScale = 100 * chirpWave[runTime[i]['stimFrame']]
+                                        gratingArray = self.CalculateGrating(i,1,contrastScale)
+                                        runTime[i]['stimulus'].tex = gratingArray
+                                    else:
+                                        runTime[i]['stimulus'].contrast = chirpWave[runTime[i]['stimFrame']]
                             #
                             # testTimer = 0
                             # testTimer = core.Clock()
@@ -1719,7 +3046,121 @@ class App(QMainWindow):
                                 for segment in range(currentSegment+1):
                                     snakeStim[i]['segments'][segment].draw()
                             else:
+                                #check aperture for each grating object, enables it
+                                if stim[i]['objectType'] == 'Grating':
+                                    # if stim[i]['objectAperture'] > 0:
+                                    #     gratingAperture = visual.Aperture(
+                                    #     win = win,
+                                    #     units = 'pix',
+                                    #     shape = 'circle',
+                                    #     size = stim[i]['objectAperture'] * ppm,
+                                    #     inverted = False,
+                                    #     pos = (xOffset * ppm,yOffset * ppm)
+                                    #     )
+                                    #     gratingAperture.enabled = True
+
+                                    # This is substitute code to allow the grating aperture to be a rectangle oriented along the motion direction
+                                    #and length defined in the GUI,  width is fixed at 50 um
+                                    if stim[i]['objectAperture'] > 0:
+                                        gratingAperture = visual.Aperture(
+                                        win = win,
+                                        units = 'pix',
+                                        ori = stim[i]['orientation'],
+                                        shape = 'circle',
+                                        size = [stim[i]['objectAperture'] * ppm,stim[i]['objectAperture'] * ppm],
+                                        inverted = False,
+                                        pos = (xOffset * ppm,yOffset * ppm)
+                                        )
+                                        gratingAperture.enabled = True
+                                        # gratingAperture.setOri(-stim[i]['orientation'],True,None)
+                                elif stim[i]['objectType'] == 'Checkerboard':
+                                    if stim[i]['objectAperture'] > 0:
+                                        checkerboardAperture = visual.Aperture(
+                                        win = win,
+                                        units = 'pix',
+                                        shape = 'circle',
+                                        size = [stim[i]['objectAperture'] * ppm,stim[i]['objectAperture'] * ppm],
+                                        inverted = False,
+                                        pos = (xOffset * ppm,yOffset * ppm)
+                                        )
+                                        checkerboardAperture.enabled = True
+                                elif stim[i]['objectType'] == 'Cloud':
+                                    
+                                     #polar coordinates or cartesian coordinates?
+                                    if stim[i]['coordinateType'] == 'Cartesian':
+                                        xPos = stim[i]['xPos']
+                                        yPos = stim[i]['yPos']
+                                    elif stim[i]['coordinateType'] == 'Polar':
+                                        xPos = stim[i]['polarRadius'] * np.cos(stim[i]['polarAngle'] * np.pi/180.)
+                                        yPos = stim[i]['polarRadius'] * np.sin(stim[i]['polarAngle'] * np.pi/180.)
+                                        
+                                    if stim[i]['objectAperture'] > 0:
+                                        
+                                        if stim[i]['trajectory'] != 'None':
+
+                                            #which segment are we on?
+                                            for s in range(trajSegments[i]['numSegments'],0,-1): #count down
+                                                if runTime[i]['stimFrame'] >= trajSegments[i]['startFrame'][s-1]:
+                                                    currentSegment = s-1
+                                                    break
+                                                else:
+                                                    currentSegment = 0
+
+                                            if int(trajDict[name]['link'][currentSegment]) > 0:
+                                                #initial position at the beginning of this segment
+                                                initX = trajectoryStim[i]['xPos'][int(trajSegments[i]['startFrame'][currentSegment] - 1)]
+                                                initY = trajectoryStim[i]['yPos'][int(trajSegments[i]['startFrame'][currentSegment] - 1)]
+
+                                                x = trajectoryStim[i]['xPos'][runTime[i]['stimFrame']] - initX
+                                                y = trajectoryStim[i]['yPos'][runTime[i]['stimFrame']] - initY
+
+                                                #Linked aperture to the trajectory
+                                                cloudAperture = visual.Aperture(
+                                                win = win,
+                                                units = 'pix',
+                                                shape = 'circle',
+                                                size = stim[i]['objectAperture'] * ppm,
+                                                inverted = False,
+                                                pos = ((xOffset + xPos)* ppm + x,(yOffset + yPos) * ppm + y)
+                                                #pos = (x,y)
+                                                )
+                                                
+                                                cloudAperture.enabled = True
+                                            else:
+                                                #Static aperture
+                                                cloudAperture = visual.Aperture(
+                                                win = win,
+                                                units = 'pix',
+                                                shape = 'circle',
+                                                size = stim[i]['objectAperture'] * ppm,
+                                                inverted = False,
+                                                pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
+                                                )
+                                                cloudAperture.enabled = True
+                                        else:
+                                             #Static aperture
+                                                cloudAperture = visual.Aperture(
+                                                win = win,
+                                                units = 'pix',
+                                                shape = 'circle',
+                                                size = stim[i]['objectAperture'] * ppm,
+                                                inverted = False,
+                                                pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
+                                                )
+                                                cloudAperture.enabled = True
+                                    else:
+                                        cloudAperture.enabled = False
+
                                 runTime[i]['stimulus'].draw() #draws every frame
+     
+
+                                #check aperture for each grating object, disables it after it was drawn as a reset for the next possible object
+                                if stim[i]['objectType'] == 'Grating':
+                                    if stim[i]['objectAperture'] > 0:
+                                        gratingAperture.enabled = False
+                                elif stim[i]['objectType'] == "Cloud":
+                                    if stim[i]['objectAperture'] > 0:
+                                        cloudAperture.enabled = False
 
                             # print(testTimer.getTime())
 
@@ -1735,17 +3176,46 @@ class App(QMainWindow):
                             runTime[i]['stimFrame'] = runTime[i]['stimFrame'] + 1
 
                         #Flip the window every loop no matter what
-                        win.flip()
+                        frameTimeStamps[frame][sweep + numSweeps*repeat] = win.flip()
 
+                        if objectON == 1:
+                            # t = (time() * 1000)
+                            # print((t - startTime)/1000)
+                            objectON = -1
+                            onTime = time() - startTime
+                            objectTimeStamps.append(onTime)
+                            writeTimestamps('ON',objectTimeStamps)
+
+                        #Save the frames to disk
+                        if exportStimulus == 1:
+                            self.exportStimulusFrames(originalStimName,frame)
 
                         frameCount = frameCount + 1
+
+                    #Normalize first frame of the stimulus onset to zero seconds
+                    whichCol = sweep + numSweeps*repeat
+
+                    startValue = frameTimeStamps[0][whichCol]
+                    frameTimeStamps[:,whichCol] -= startValue
+                
+                    #add on the actual measured on time
+                    # frameTimeStamps += onTime
 
                     #flip sync spot back to dark before next sweeep
                     self.drawSyncSpot(syncSpot,-1)
                     win.flip()
 
+                    #Save the frame time stamps to the stimulus log file
+                    writeTimestamps('Frames',frameTimeStamps)
+
+                    self.stimCountDown.setText('')
+                    self.sweepMonitor.setText('')
+
                     #Wait for trial time to expire before starting next sweep
                     while totalTimer.getTime() < trialTime:
+                        #show a seconds timer for when the trial will actually reset
+                        # self.stimCountDown.setText("%.0f" % (totalTimer.getTime()))
+
                         #flip the sync spot at the end of the sweep
                         self.drawSyncSpot(syncSpot,-1)
                         win.flip()
@@ -1754,24 +3224,83 @@ class App(QMainWindow):
                 self.drawSyncSpot(syncSpot,-1)
                 win.flip()
 
+    def CalculateGrating(self,i,polarity,contrast):
+        # bgnd255 = int(self.background.text())
+        # bgnd255 =  (2 * bgnd255/255.) - 1
+
+        type = self.getGratingType(i)
+
+        MaxValue = 2**BitDepth - 1
+
+        bgnd4095 = int(self.background.text())
+
+        if bgnd4095 == 0:
+            bgnd4095 = 2047
+
+        bgnd4095 =  (2 * bgnd4095/float(MaxValue)) - 1
+
+        gratingSize = win.size[0]
+
+        rowArray = np.zeros([int(gratingSize)],dtype=float)
+        rowArray[:] = np.arange(int(gratingSize))
+
+        # indexArray = bgnd255 + (polarity * contrast / 100.0) * (-1 - bgnd255) * np.sin(2 * np.pi * 1 * rowArray/(gratingSize))
+        indexArray = bgnd4095 + (polarity * contrast / 100.0) * (-1 - bgnd4095) * np.sin(2 * np.pi * 1 * rowArray/(gratingSize))
+
+        #convert to 0-255 for gamma correction
+        # indexArray255 = 255 * (indexArray + 1.) / 2.
+        
+        #convert to 0-4095 for gamma correction
+        indexArray4095 = MaxValue * (indexArray + 1.) / 2.
+
+        if type == 'sqr':
+            maxVal = np.max(indexArray4095)
+            minVal = np.min(indexArray4095)
+            midVal = (maxVal + minVal) / 2.
+            
+            indexArray4095 = np.where(indexArray4095 < midVal,minVal,maxVal)
+
+        #Ensure no clipping
+        # indexArray255 = np.where(indexArray255 > 255,255,indexArray255)
+        # indexArray255 = np.where(indexArray255 < 0,0,indexArray255)
+
+        #gamma correct the grating values
+        # with np.nditer(indexArray255,op_flags=['readwrite']) as it:
+        #     for x in it:
+        #         x[...] = gammaTable[int(x)]
+
+        with np.nditer(indexArray4095,op_flags=['readwrite']) as it:
+            for x in it:
+                x[...] = gammaTable[int(x)]
+
+        #convert back to -1 to 1 range
+        # indexArrayGamma = (2 * indexArray255/255.) - 1
+        indexArrayGamma = (2 * indexArray4095/float(MaxValue)) - 1
+
+        gratingArray = np.tile(indexArrayGamma,(int(gratingSize),1))
+        
+        return gratingArray
+
     #Defines the stimulus textures
     def defineStimulus(self,runTime,ppm,xOffset,yOffset,i,ifi,sweep):
-        global motionCloud, mask, ortho,stimArray,snakeStim#, innerRing, outerRing
+        global mask, ortho,snakeStim,stimFrames,cloudArray#,stimArray, innerRing, outerRing
 
         firstIntensity = runTime[i]['firstIntensity']
         secondIntensity = runTime[i]['secondIntensity']
         bgnd = self.getBackground()
+        
+        MaxValue = 2**BitDepth - 1
 
-        # w = win.size[0]/2
-        # h = win.size[1]/2
+        w = win.size[0]/2
+        h = win.size[1]/2
 
         #polar coordinates or cartesian coordinates?
         if stim[i]['coordinateType'] == 'Cartesian':
             xPos = stim[i]['xPos']
             yPos = stim[i]['yPos']
         elif stim[i]['coordinateType'] == 'Polar':
-            xPos = stim[i]['polarRadius'] * np.cos(stim[i]['polarAngle'] * pi/180)
-            yPos = stim[i]['polarRadius'] * np.sin(stim[i]['polarAngle'] * pi/180)
+            xPos = stim[i]['polarRadius'] * np.cos(stim[i]['polarAngle'] * np.pi/180.)
+            yPos = stim[i]['polarRadius'] * np.sin(stim[i]['polarAngle'] * np.pi/180.)
 
         # if stim[i]['maskCoordinateType'] == 'Cartesian':
         #     xPosMask = stim[i]['maskXPos']
@@ -1779,7 +3308,6 @@ class App(QMainWindow):
         # elif stim[i]['maskCoordinateType'] == 'Polar':
         #     xPosMask = stim[i]['maskPolarRadius'] * np.cos(stim[i]['maskPolarAngle'] * pi/180)
         #     yPosMask = stim[i]['maskPolarRadius'] * np.sin(stim[i]['maskPolarAngle'] * pi/180)
-
 
         if stim[i]['objectType'] == 'Circle':
 
@@ -1819,24 +3347,103 @@ class App(QMainWindow):
             type = self.getGratingType(i)
 
 
-            #resolve masks
-            #mask = self.getMask(w,h,i,ppm)
+            #2022 fixes. Generate grating through numpy array, so that it can handle offset
+            #backgrounds that aren't around the middle intensity value.
+            
+            # bgnd255 = int(self.background.text())
+            # bgnd255 =  (2 * bgnd255/255.) - 1
+
+            bgnd4095 = int(self.background.text())
+
+            if bgnd4095 == 0:
+                bgnd4095 = 2047
+
+            bgnd4095 = (2 * bgnd4095/float(MaxValue)) - 1
+            
+            gratingSize = win.size[0]
+
+            rowArray = np.zeros([int(gratingSize)],dtype=float)
+
+            #TESTING
+            rowArray[:] = np.arange(int(gratingSize))
+
+            # indexArray = bgnd255 + (stim[i]['contrast'] / 100.0) * (-1 - bgnd255) * np.sin(2 * np.pi * 1 * rowArray/(gratingSize))
+            indexArray = bgnd4095 + (stim[i]['contrast'] / 100.0) * (-1 - bgnd4095) * np.sin(2 * np.pi * 1 * rowArray/(gratingSize))
+
+            #convert to 0-255 for gamma correction
+            # indexArray255 = 255 * (indexArray + 1.) / 2.
+            
+            #convert to 0-4095 for gamma correction
+            indexArray4095 = MaxValue * (indexArray + 1.) / 2.
+
+            if type == 'sqr':
+                maxVal = np.max(indexArray4095)
+                minVal = np.min(indexArray4095)
+                midVal = (maxVal + minVal) / 2.
+                
+                indexArray4095 = np.where(indexArray4095 < midVal,minVal,maxVal)
+
+
+            #Ensure no clipping
+            # indexArray255 = np.where(indexArray255 > 255,255,indexArray255)
+            # indexArray255 = np.where(indexArray255 < 0,0,indexArray255)
+
+            #gamma correct the grating values
+            # with np.nditer(indexArray255,op_flags=['readwrite']) as it:
+            #     for x in it:
+            #         x[...] = gammaTable[int(x)]
+
+            with np.nditer(indexArray4095,op_flags=['readwrite']) as it:
+                for x in it:
+                    x[...] = gammaTable[int(x)]
+
+            #convert back to -1 to 1 range
+            # indexArrayGamma = (2 * indexArray255/255.) - 1
+            indexArrayGamma = (2 * indexArray4095/float(MaxValue)) - 1
+
+            gratingArray = np.tile(indexArrayGamma,(int(gratingSize),1))
+
+            # rowArray = np.zeros([int(gratingSize)],dtype=float)
+            # rowArray[:] = np.arange(int(gratingSize))
+            # indexArray = np.tile(rowArray,(int(gratingSize),1))
+
+            # #calculate the grating as a single cycle
+            # gratingArray = bgnd + (stim[i]['contrast'] / 100.0) * (-1 - bgnd) * np.sin(2 * np.pi * 1 * indexArray/(gratingSize))
 
             stimulus = visual.GratingStim(
             win = win,
             units = 'pix',
-            size=[w*2,h*2],
-            tex = type,
-            texRes = 256,
+            size=[gratingSize,gratingSize],
+            tex = gratingArray,
+            texRes = 1024,
             #mask = mask,
             #maskParams = {'fringeWidth':0.2},
             sf = stim[i]['spatialFreq'] / (ppm * 1000),
-            ori = stim[i]['orientation'],
+            ori = -stim[i]['orientation'],
             phase = stim[i]['spatialPhase']/360.0,#phase is fractional from 0 to 1
             color = [1,1,1],
-            contrast = stim[i]['contrast']/100.0,
+            contrast = 1.0,
             pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
             )
+
+            #resolve masks
+            #mask = self.getMask(w,h,i,ppm)
+
+            # stimulus = visual.GratingStim(
+            # win = win,
+            # units = 'pix',
+            # size=[w*2,h*2],
+            # tex = type,
+            # texRes = 1024,
+            # #mask = mask,
+            # #maskParams = {'fringeWidth':0.2},
+            # sf = stim[i]['spatialFreq'] / (ppm * 1000),
+            # ori = stim[i]['orientation'],
+            # phase = stim[i]['spatialPhase']/360.0,#phase is fractional from 0 to 1
+            # color = [1,1,1],
+            # contrast = stim[i]['contrast']/100.0,
+            # pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
+            # )
 
             #make orthogonal grating
 
@@ -1857,9 +3464,12 @@ class App(QMainWindow):
                 opacity = 0.5,
                 pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
                 )
-        elif stim[i]['objectType'] == 'Noise':
+        elif stim[i]['objectType'] == 'Checkerboard':
             #set the seed for random number generator
             np.random.seed(stim[i]['noiseSeed'])
+
+            # adjustedNoiseSize = round(stim[i]['noiseSize'] * ppm) / ppm
+            # self.noiseSize.setText(str(round(adjustedNoiseSize)))
 
             stimulus = visual.NoiseStim(
             win = win,
@@ -1867,10 +3477,40 @@ class App(QMainWindow):
             units = 'pix',
             noiseType = stim[i]['noiseType'],
             contrast = stim[i]['contrast']/100.0,
-            noiseElementSize = stim[i]['noiseSize'] * ppm,
+            noiseElementSize = int(stim[i]['noiseSize'] * ppm),
             noiseClip = 1,
             pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
             )
+        
+        elif stim[i]['objectType'] == 'Checkerboard 1D':
+            #set the seed for random number generator
+            np.random.seed(stim[i]['noiseSeed'])
+            
+            noiseY = int(stim[i]['width'] * ppm)
+            noiseX = np.ceil(stim[i]['length'] * ppm)
+            pixWidth = int(stim[i]['pixelWidth'] * ppm)
+
+            #adds one extra pixel onto the end to avoid errors. Not sure about why this works yet.
+            # mod = np.mod(noiseX,pixWidth)
+            # noiseX += (pixWidth - mod) #+ pixWidth
+
+            # print(noiseX,noiseY)
+            # print(pixWidth,noiseY)
+
+            stimulus = visual.NoiseStim(
+            win = win,
+            size = [noiseX,noiseY],
+            # size = [512,512],
+            units = 'pix',
+            noiseType = stim[i]['noiseType'],
+            contrast = stim[i]['contrast']/100.0,
+            noiseElementSize = (pixWidth,noiseY),
+            ori=stim[i]['orientation'],
+            noiseClip = 1,
+            pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
+            )
+
+
         elif stim[i]['objectType'] == 'Cloud':
 
             #Motion Clouds (keyword) parameters:
@@ -1911,6 +3551,10 @@ class App(QMainWindow):
             frames = int(stim[i]['duration']/ifi)
             #fx, fy, ft = mc.get_grids(mc.N_X, mc.N_Y, mc.N_frame)
 
+             #is this a random walk motion cloud? If so, only generate a single frame
+            if stim[i]['motionType'] == "Random Walk":
+                frames = 0
+
             #proportional to 1024 x 768
             fx, fy, ft = mc.get_grids(256, 256, frames+1)
             # define an envelope
@@ -1919,8 +3563,12 @@ class App(QMainWindow):
             #testTime = core.Clock()
 
             #this is the most time intensive step - 50%
+            
+            #7/15/22
+            #I've switched the cloudSpeedX and cloudSpeedY parameter inputs to this function becase the actual presentation
+            #on the monitor is flipped. Now X is actually referencing horizontal dimension on the monitor/projector.
             envelope = mc.envelope_gabor(fx, fy, ft,
-            V_X=stim[i]['cloudSpeedX'], V_Y=stim[i]['cloudSpeedY'], B_V=stim[i]['cloudSpeedBand'],
+            V_X=stim[i]['cloudSpeedY'], V_Y=stim[i]['cloudSpeedX'], B_V=stim[i]['cloudSpeedBand'],
             sf_0=stim[i]['cloudSF'], B_sf=stim[i]['cloudSFBand'],
             theta=stim[i]['cloudOrient'] * np.pi/180, B_theta=stim[i]['cloudOrientBand'] * np.pi/180, alpha=0.)
 
@@ -1930,16 +3578,16 @@ class App(QMainWindow):
             #testTime = core.Clock()
 
             #this is the second most time intensive step - 43%
-            motionCloud = mc.random_cloud(envelope)
-
+            
+            cloudArray[i]['MotionCloud'] = mc.random_cloud(envelope,seed=1)
+            
             #print(testTime.getTime())
 
             #testTime = 0
             #testTime = core.Clock()
 
             #this is the least time intensive step - 6%
-            motionCloud = self.rectif_stimGen(motionCloud,contrast=stim[i]['contrast']/100.0,method='Michelson',verbose=False)
-
+            cloudArray[i]['MotionCloud'] = self.rectif_stimGen( cloudArray[i]['MotionCloud'],contrast=stim[i]['contrast']/100.0,method='Michelson',verbose=False)
 
             #print(testTime.getTime())
             #doesn't return the stimulus, but sets the array as a global
@@ -2045,13 +3693,13 @@ class App(QMainWindow):
                 angle = trajDict[name]['angle'][x]
                 if angle.isnumeric():
                     orientation = angle
-                    continue
+                    # continue
                 elif str(trajDict[name]['angle'][x]) in seqList:
                     #is the entry a sequence?
                     #If so, replace the trajectory segment with the sequence entry for the current sweep
                     theSequence = str(trajDict[name]['angle'][x])
                     orientation = seqDict[theSequence][sweep]
-
+            
                 snakeStim[i]['segments'][x] = visual.Rect(
                     win = win,
                     units = 'pix',
@@ -2074,10 +3722,71 @@ class App(QMainWindow):
                     win=win,
                     units = 'pix',
                     image = imagePath,
-                    size = (1024,768),
+                    size = (1280,800),
                     ori = stim[i]['orientation'],
                     pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
                     )
+        elif stim[i]['objectType'] == 'Frames':
+            subfolder = self.subFolder.currentText()
+            framePath = stimPath + subfolder + '/Frames/' + self.framePath.currentText() + '/'
+
+            #gets all the images in the folder, these must be .bmps and nothing else in the folder
+            frameList = os.listdir(framePath)
+
+            #load the frames into a numpy array
+            stimFrames = np.array([np.array(Image.open(framePath + fname)) for fname in frameList])
+
+            #normalize from -1 to 1
+            # stimFrames = (stimFrames / 255.) * 2. - 1.
+            stimFrames = (stimFrames / float(MaxValue)) * 2. - 1.
+
+            if framePath != '':
+                stimulus = visual.ImageStim(
+                    win=win,
+                    units = 'pix',
+                    image = stimFrames[0],
+                    size = (1280,800),
+                    ori = 0,
+                    pos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm)
+                    )
+        elif stim[i]['objectType'] == 'Random Dot':
+            stimulus = visual.FixedDirDotStim(
+                win = win,
+                units = 'pix',
+                seed = 1,
+                nDots = int(stim[i]['numDots']),
+                coherence = float(stim[i]['dotCoherence'] / 100),
+                fieldPos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm),
+                fieldSize = 1000 * ppm, #1000 micron diameter field size as default
+                dotSize = stim[i]['diameter'] * ppm,
+                dotLife = -1, #infinite dot life as default
+                fieldShape = 'circle', #default shape of the array
+                dir = stim[i]['signalDirection'],
+                noiseDir = stim[i]['noiseDirection'],
+                speed = stim[i]['speed'] * ppm * ifi, #speed is in 'units per frame'
+                contrast = firstIntensity,
+                signalDots = 'same',
+                noiseDots = 'direction'
+            )
+            
+            np.random.seed(1)
+            # stimulus = visual.FixedDirDotStim(
+            #     win = win,
+            #     units = 'pix',
+            #     nDots = stim[i]['numDots'],
+            #     coherence = float(stim[i]['dotCoherence'] / 100),
+            #     fieldPos = ((xOffset + xPos) * ppm,(yOffset + yPos) * ppm),
+            #     fieldSize = 1000 * ppm, #1000 micron diameter field size as default
+            #     dotSize = stim[i]['diameter'] * ppm,
+            #     dotLife = -1, #infinite dot life as default
+            #     dir = stim[i]['signalDirection'],
+            #     noiseDir = stim[i]['noiseDirection'],
+            #     speed = stim[i]['speed'] * ppm * ifi, #speed is in 'units per frame'
+            #     contrast = firstIntensity,
+            #     signalDots = 'same',
+            #     noiseDots = 'direction'
+            # )
+
         else:
             print('other')
 
@@ -2094,12 +3803,29 @@ class App(QMainWindow):
                 edges = 100,
                 pos = ((xOffset + xPosMask) * ppm,(yOffset + yPosMask) * ppm)
                 )
-
         return stimulus
+
+    #Exports the stimulus into bitmap frames files
+    def exportStimulusFrames(self,stimName,frame):
+        #Frames are saved to a subfolder in the stimulus bank folder
+        subfolder = self.subFolder.currentText()
+        path = stimPath + subfolder + "/Frames/"
+
+        if os.path.isdir(path) == False:
+            os.mkdir(path)
+
+        path = path + stimName + "/"
+
+        if os.path.isdir(path) == False:
+            os.mkdir(path)
+
+        #save the frame to .bmp file
+        exportStimName = path + stimName + "_" + str(frame) + '.bmp'
+        win._getFrame().save(exportStimName)
 
     #calculates the frames for each segent of the trajectory
     def calculateTrajectory(self,name,i,sweep,ifi,ppm,xOffset,yOffset):
-        global runTime,trajectoryStim
+        global runTime,trajectoryStim,trajSegments
 
         #makes a working copy of trajectory dictionary in case it contains a sequence string
         #in this case the working copy needs to be edited to contain the values within the sequence.
@@ -2107,15 +3833,68 @@ class App(QMainWindow):
 
         numSegments = len(trajDict[name]['angle'])
 
+        doHold = 0
+
+        #trajectory segment timing dictionary
+        
+        # trajSegments[i]['numSegments'] = numSegments
+        # trajSegments[i]['startFrame'][0] = 0
+        # totalFrames = 0
+
+        # #Find the starting frames for each segment
+        # for x in range(1,numSegments):
+        #     trajSegments[i]['startFrame'][x] = totalFrames + round(float(trajDict[name]['duration'][x-1]) / ifi)
+        #     totalFrames = trajSegments[i]['startFrame'][x]
+
         for segment in range(numSegments):
+            #check for sequence assignment for angles and duration
             if trajDict[name]['angle'][segment].isnumeric():
                 #numeric entry
-                continue
+                
+                pass
             elif str(trajDict[name]['angle'][segment]) in seqList:
-                #is the entry a sequence?
+                #is the angle entry a sequence?
                 #If so, replace the trajectory segment with the sequence entry for the current sweep
                 theSequence = str(trajDict[name]['angle'][segment])
                 liveTrajDict[name]['angle'][segment] = seqDict[theSequence][sweep]
+        
+            if trajDict[name]['duration'][segment].isnumeric():
+                #numeric entry
+                pass
+            elif str(trajDict[name]['duration'][segment]) in seqList:
+                #is the duration entry a sequence?
+                #If so, replace the trajectory segment with the sequence entry for the current sweep
+                theSequence = str(trajDict[name]['duration'][segment])
+                liveTrajDict[name]['duration'][segment] = seqDict[theSequence][sweep]
+
+            #check for sequence assignment for speed
+            if trajDict[name]['speed'][segment].isnumeric():
+                #numeric entry
+                doHold = 0
+                pass
+            elif str(trajDict[name]['speed'][segment]) == "*Hold*":
+                doHold = 1
+            elif str(trajDict[name]['speed'][segment]) == "*Walk*":
+                doHold = 2 #triggers random walk to set in
+            elif str(trajDict[name]['speed'][segment]) in seqList:
+                #is the entry a sequence?
+                #If so, replace the trajectory segment with the sequence entry for the current sweep
+                theSequence = str(trajDict[name]['speed'][segment])
+                liveTrajDict[name]['speed'][segment] = seqDict[theSequence][sweep]
+                doHold = 0
+
+         #trajectory segment timing dictionary
+        # print(liveTrajDict)
+
+        trajSegments[i]['numSegments'] = numSegments
+        trajSegments[i]['startFrame'][0] = 0
+        totalFrames = 0
+
+        #Find the starting frames for each segment
+        for x in range(1,numSegments):
+            trajSegments[i]['startFrame'][x] = totalFrames + round(float(liveTrajDict[name]['duration'][x-1]) / ifi)
+            totalFrames = trajSegments[i]['startFrame'][x]
+
 
         #make trajectory dictionary for the object
         trajectoryStim[i] = {
@@ -2123,8 +3902,17 @@ class App(QMainWindow):
         'yPos':np.zeros(0)
         }
 
-        for segment in range(numSegments):
+        #polar coordinates or cartesian coordinates for start position?
+        if stim[i]['coordinateType'] == 'Cartesian':
+            xPos = stim[i]['xPos']
+            yPos = stim[i]['yPos']
+        elif stim[i]['coordinateType'] == 'Polar':
+            xPos = stim[i]['polarRadius'] * np.cos(stim[i]['polarAngle'] * np.pi/180.)
+            yPos = stim[i]['polarRadius'] * np.sin(stim[i]['polarAngle'] * np.pi/180.)
 
+        
+        for segment in range(numSegments):
+            
             #get angles and total frames per segment
             runTime[i]['trajectory']['angle'].append(liveTrajDict[name]['angle'][segment])
 
@@ -2134,13 +3922,25 @@ class App(QMainWindow):
                 #numFrames = numFrames + (0.5 * stim[i]['width'] / stim[i]['speed']) #add extra frames to account for the center of the starting snake getting to the turn position
                 segmentFrames = np.zeros(numFrames+1)
 
+                if str(trajDict[name]['speed'][segment]) == "*Hold*":
+                    doHold = 1
+                elif str(trajDict[name]['speed'][segment]) == "*Walk*":
+                    doHold = 2 #triggers random walk to set in
+                else:
+                    doHold = 0
+
+                if doHold == 0:
+                    segmentSpeed = float(liveTrajDict[name]['speed'][segment])
+
                 runTime[i]['trajectory']['startFrame'].append(0)
 
-                #start position for first segment
-                startX = ppm * (xOffset + stim[i]['xPos']) + ppm * stim[i]['startRad'] * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180.)
-                startY = ppm * (yOffset + stim[i]['yPos']) + ppm * stim[i]['startRad'] * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180.)
+                
 
                 if stim[i]['objectType'] == 'Snake':
+                    #start position for first segment
+                    startX = ppm * (xOffset + xPos) + ppm * stim[i]['startRad'] * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180.)
+                    startY = ppm * (yOffset + yPos) + ppm * stim[i]['startRad'] * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180.)
+
                     #X position segment - half as much distance traveled because its a growing rectangle that is also changing its length simultaneously
                     segmentFrames[:] = [startX + 0.5 * ppm * stim[i]['speed'] * ifi * t * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(0,numFrames+1,1)]
                     trajectoryStim[i]['xPos'] = np.append(trajectoryStim[i]['xPos'],segmentFrames)
@@ -2149,14 +3949,94 @@ class App(QMainWindow):
                     segmentFrames[:] = [startY + 0.5 * ppm * stim[i]['speed'] * ifi * t * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(0,numFrames+1,1)]
                     trajectoryStim[i]['yPos'] = np.append(trajectoryStim[i]['yPos'],segmentFrames)
                 else:
-                    #X position segment
-                    segmentFrames[:] = [startX + ppm * stim[i]['speed'] * ifi * t * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(0,numFrames+1,1)]
-                    trajectoryStim[i]['xPos'] = np.append(trajectoryStim[i]['xPos'],segmentFrames)
+                    #start position for first segment
+                    if stim[i]['objectType'] == 'Cloud':
+                        #no coordinates, always centered for clouds. 
+                        #Entering a coordinate moves the aperture of the cloud around, not the cloud itself.
+                        startX = ppm * (xOffset) 
+                        startY = ppm * (yOffset)
+                    else:
+                        startX = ppm * (xOffset + xPos) + ppm * stim[i]['startRad'] * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180.)
+                        startY = ppm * (yOffset + yPos) + ppm * stim[i]['startRad'] * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180.)
 
-                    #Y position segment
-                    segmentFrames[:] = [startY + ppm * stim[i]['speed'] * ifi * t * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(0,numFrames+1,1)]
-                    trajectoryStim[i]['yPos'] = np.append(trajectoryStim[i]['yPos'],segmentFrames)
+                    #X position segment
+                    # segmentFrames[:] = [startX + ppm * stim[i]['speed'] * ifi * t * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(0,numFrames+1,1)]
+                    if doHold == 0:
+                        segmentFrames[:] = [startX + ppm * segmentSpeed * ifi * t * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(0,numFrames+1,1)]
+                        trajectoryStim[i]['xPos'] = np.append(trajectoryStim[i]['xPos'],segmentFrames)
+
+                        #Y position segment
+                        # segmentFrames[:] = [startY + ppm * stim[i]['speed'] * ifi * t * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(0,numFrames+1,1)]
+                        segmentFrames[:] = [startY + ppm * segmentSpeed * ifi * t * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(0,numFrames+1,1)]
+                        trajectoryStim[i]['yPos'] = np.append(trajectoryStim[i]['yPos'],segmentFrames)
+                    elif doHold == 1:
+                        segmentFrames[:] = [startX for t in np.arange(0,numFrames+1,1)]
+                        trajectoryStim[i]['xPos'] = np.append(trajectoryStim[i]['xPos'],segmentFrames)
+
+                        #Y position segment
+                        # segmentFrames[:] = [startY + ppm * stim[i]['speed'] * ifi * t * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(0,numFrames+1,1)]
+                        segmentFrames[:] = [startY for t in np.arange(0,numFrames+1,1)]
+                        trajectoryStim[i]['yPos'] = np.append(trajectoryStim[i]['yPos'],segmentFrames)
+                    elif doHold == 2:
+                        #random walk
+                        randomWalkInterval =  round((1. / stim[i]['walkFreq']) / ifi)
+                        randomWalkFrameCount = 0
+
+                        for frame in np.arange(numFrames + 1):
+                            
+                            #set the angle on the first frame
+                            if frame == 0:
+                                randomWalkAngle = 0
+
+
+                            #only reset the random walk angle according to the update frequency
+                            if randomWalkFrameCount > randomWalkInterval:
+                                randomWalkFrameCount = 0
+
+                                #random angle between 0 and 360 degrees
+                                randomWalkAngle = randint(0,360)
+                                
+                            #coordinates the jitter for all motion clouds:
+                            #sets the walk angle to be the same as that of the first cloud definition
+                            #if only 1 cloud is defined, this will do nothing
+                            # runTime[i]['randomWalkAngle'] = runTime[firstCloud]['randomWalkAngle']
+                            
+                            #increments the position of the stimulus according to the new angle
+                            x = ppm * stim[i]['speed'] * ifi * np.cos(randomWalkAngle * np.pi/180)
+                            y = ppm * stim[i]['speed'] * ifi * np.sin(randomWalkAngle * np.pi/180)
+
+                            size = len(trajectoryStim[i]['xPos'])
+                            if size > 0:
+                                newPosX = trajectoryStim[i]['xPos'][size-1] + x
+                                newPosY = trajectoryStim[i]['yPos'][size-1] + y
+                            else:
+                                newPosX = startX + x
+                                newPosY = startY + y
+
+                                #boundary conditions, reverse direction if stimulus begins to overrun the boundary (150 um from center)
+                            if newPosX > 150 * ppm or newPosX < -150* ppm:
+                                x = -x
+                                newPosX = trajectoryStim[i]['xPos'][size-1] + 2*x
+
+                            if newPosY > 150* ppm or newPosY < -150* ppm:
+                                y = -y
+                                newPosY = trajectoryStim[i]['yPos'][size-1] + 2*y
+                            
+
+                            trajectoryStim[i]['xPos'] = np.append(trajectoryStim[i]['xPos'],newPosX)
+                            trajectoryStim[i]['yPos'] = np.append(trajectoryStim[i]['yPos'],newPosY)    
+                            
+                            randomWalkFrameCount += 1
+                            
             else:
+
+                if str(trajDict[name]['speed'][segment]) == "*Hold*":
+                    doHold = 1
+                elif str(trajDict[name]['speed'][segment]) == "*Walk*":
+                    doHold = 2
+                else:
+                    doHold = 0
+
                 if stim[i]['objectType'] == 'Snake':
                     numFrames = int(round(float(liveTrajDict[name]['duration'][segment])/ifi)) #frames in the current segment
                     segmentFrames = np.zeros(numFrames)
@@ -2178,16 +4058,76 @@ class App(QMainWindow):
                     numFrames = int(round(float(liveTrajDict[name]['duration'][segment])/ifi)) #frames in the current segment
                     segmentFrames = np.zeros(numFrames)
 
-                    size = len(trajectoryStim[i]['xPos'])
-                    prevStartPos = trajectoryStim[i]['xPos'][size-1]
-                    segmentFrames[:] = [prevStartPos + ppm * stim[i]['speed'] * ifi * t * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
-                    trajectoryStim[i]['xPos'] = np.append(trajectoryStim[i]['xPos'],segmentFrames)
+                    if doHold == 1:
+                        size = len(trajectoryStim[i]['xPos'])
+                        prevStartPos = trajectoryStim[i]['xPos'][size-1]
+                        segmentFrames[:] = [prevStartPos for t in np.arange(1,numFrames+1,1)]
+                        trajectoryStim[i]['xPos'] = np.append(trajectoryStim[i]['xPos'],segmentFrames)
 
-                    size = len(trajectoryStim[i]['yPos'])
-                    prevStartPos = trajectoryStim[i]['yPos'][size-1]
-                    segmentFrames[:] = [prevStartPos + ppm * stim[i]['speed'] * ifi * t * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
-                    trajectoryStim[i]['yPos'] = np.append(trajectoryStim[i]['yPos'],segmentFrames)
+                        size = len(trajectoryStim[i]['yPos'])
+                        prevStartPos = trajectoryStim[i]['yPos'][size-1]
+                        segmentFrames[:] = [prevStartPos for t in np.arange(1,numFrames+1,1)]
+                        trajectoryStim[i]['yPos'] = np.append(trajectoryStim[i]['yPos'],segmentFrames)
+                    elif doHold == 0:
+                        segmentSpeed = float(liveTrajDict[name]['speed'][segment])
+                        size = len(trajectoryStim[i]['xPos'])
+                        prevStartPos = trajectoryStim[i]['xPos'][size-1]
+                        # segmentFrames[:] = [prevStartPos + ppm * stim[i]['speed'] * ifi * t * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
+                        segmentFrames[:] = [prevStartPos + ppm * segmentSpeed * ifi * t * np.cos(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
+                        trajectoryStim[i]['xPos'] = np.append(trajectoryStim[i]['xPos'],segmentFrames)
 
+                        size = len(trajectoryStim[i]['yPos'])
+                        prevStartPos = trajectoryStim[i]['yPos'][size-1]
+                        # segmentFrames[:] = [prevStartPos + ppm * stim[i]['speed'] * ifi * t * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
+                        segmentFrames[:] = [prevStartPos + ppm * segmentSpeed * ifi * t * np.sin(float(liveTrajDict[name]['angle'][segment]) * np.pi/180) for t in np.arange(1,numFrames+1,1)]
+                        trajectoryStim[i]['yPos'] = np.append(trajectoryStim[i]['yPos'],segmentFrames)
+                    elif doHold == 2:
+                        #random walk
+                        randomWalkInterval =  round((1. / stim[i]['walkFreq']) / ifi)
+                        randomWalkFrameCount = 0
+
+                        for frame in np.arange(numFrames + 1):
+                            
+                            if frame == 0:
+                                randomWalkAngle = 0
+                                
+                            if randomWalkFrameCount > randomWalkInterval:
+                                randomWalkFrameCount = 0
+
+                                #random angle between 0 and 360 degrees
+                                randomWalkAngle = randint(0,360)
+                                
+                            #coordinates the jitter for all motion clouds:
+                            #sets the walk angle to be the same as that of the first cloud definition
+                            #if only 1 cloud is defined, this will do nothing
+                            # runTime[i]['randomWalkAngle'] = runTime[firstCloud]['randomWalkAngle']
+
+                            #increments the position of the stimulus according to the new angle
+                            x = ppm * stim[i]['speed'] * ifi * np.cos(randomWalkAngle * np.pi/180)
+                            y = ppm * stim[i]['speed'] * ifi * np.sin(randomWalkAngle * np.pi/180)
+
+                            #boundary conditions, reverse direction if stimulus begins to overrun the boundary (150 um from center)
+                            if newPosX + x > 150 or newPosX + x < -150:
+                                x = -x
+                                newPosX = trajectoryStim[i]['xPos'][size-1] + x
+                            if newPosY + y > 150 or newPosY + y < -150:
+                                y = -y
+                                newPosY = trajectoryStim[i]['yPos'][size-1] + y
+                                
+                            size = len(trajectoryStim[i]['xPos'])
+                            if size > 0:
+                                newPosX = trajectoryStim[i]['xPos'][size-1] + x
+                                newPosY = trajectoryStim[i]['yPos'][size-1] + y
+                            else:
+                                newPosX = startX
+                                newPosY = startY
+                            
+                            trajectoryStim[i]['xPos'] = np.append(trajectoryStim[i]['xPos'],newPosX)
+                            trajectoryStim[i]['yPos'] = np.append(trajectoryStim[i]['yPos'],newPosY)    
+                            
+                            randomWalkFrameCount += 1
+            
+            
     #returns the X/Y position of the object according to its trajectory
     def getTrajectoryPosition(self,i,ifi,ppm):
         if stim[i]['objectType'] == 'Snake':
@@ -2214,7 +4154,8 @@ class App(QMainWindow):
         return (x,y)
 
     #builds the wave to hold the temporal modulation for a chirp stimulus
-    def buildChirp(self,i,ifi):
+    def buildChirp(self,i,ifi,gammaCorrected):
+        global gammaTable
         contrast = stim[i]['contrast'] / 100.0 #contrast chirp maximum
         TF_low = 0.5 #low end of the temporal frequency chirp
         TF_high = 8.0 #high end of the temporal frequency chirp
@@ -2222,18 +4163,39 @@ class App(QMainWindow):
         duration = int(round(15.0/ifi)) #15 second chirp stimulus
 
         chirpWave = np.zeros(0) #makes chirp wave of set duration
+        
+        [firstIntensity,secondIntensity] = self.getIntensity(i)
+        bgnd = self.getBackground()
+
+        MaxValue = 2**BitDepth - 1
+
+        bgndRaw = int(self.background.text())
+        bgndRaw = (2 * bgndRaw/float(MaxValue)) - 1
 
         #initial flashes
-        segment = np.full(int(round(1./ifi)),-contrast)
+        if gammaCorrected == 1:
+            segment = np.full(int(round(1./ifi)),secondIntensity)
+        else:
+            segment = np.full(int(round(1./ifi)),-contrast)
         chirpWave = np.append(chirpWave,segment)
 
-        segment = np.full(int(round(1./ifi)),contrast)
+        if gammaCorrected == 1:
+            segment = np.full(int(round(1./ifi)),firstIntensity)
+        else:
+            segment = np.full(int(round(1./ifi)),contrast)
         chirpWave = np.append(chirpWave,segment)
 
-        segment = np.full(int(round(1./ifi)),-contrast)
+        if gammaCorrected == 1:
+            segment = np.full(int(round(1./ifi)),secondIntensity)
+        else:
+            segment = np.full(int(round(1./ifi)),-contrast)
         chirpWave = np.append(chirpWave,segment)
 
-        segment = np.zeros(int(round(1./ifi)))
+        if gammaCorrected == 1:
+            segment = np.full(int(round(1./ifi)),bgnd)
+        else:
+            segment = np.full(int(round(1./ifi)),bgndRaw)
+
         chirpWave = np.append(chirpWave,segment)
 
         frames = int(round(4.0/ifi)) + 1 # length in frames of the temporal frequency and contrast chirps. Set for 4 seconds currently.
@@ -2241,23 +4203,48 @@ class App(QMainWindow):
         #temporal frequency chirp
         segment = np.zeros(frames)
         segment[:] = [contrast * np.sin(4.0 * 2 * np.pi * 0.5 * ((TF_high * x/frames) + TF_low) * x/frames) for x in np.arange(0,frames,1)]
+
+        #gamma correct the segment
+        if gammaCorrected == 1:
+            segment4095 = MaxValue * (segment + 1.) / 2.
+            with np.nditer(segment4095,op_flags=['readwrite']) as it:
+                for x in it:
+                    x[...] = gammaTable[int(x)]
+            segment = (2 * segment4095/float(MaxValue)) - 1
+
         chirpWave = np.append(chirpWave,segment)
 
         #1 second pause in between temporal frequency and contrast chirps
-        segment = np.zeros(int(round(1.0/ifi)))
+        if gammaCorrected == 1:
+            segment = np.full(int(round(1.0/ifi)),bgnd)
+        else:
+            segment = np.full(int(round(1.0/ifi)),bgndRaw)
         chirpWave = np.append(chirpWave,segment)
 
         #contrast chirp
         segment = np.zeros(frames)
         segment[:] = [contrast * x/frames * np.sin(4.0 * 2 * np.pi * TF_mid * x/frames) for x in np.arange(0,frames,1)]
+
+        #gamma correct the segment
+        if gammaCorrected == 1:
+            segment4095 = MaxValue * (segment + 1.) / 2.
+            with np.nditer(segment4095,op_flags=['readwrite']) as it:
+                for x in it:
+                    x[...] = gammaTable[int(x)]
+            segment = (2 * segment4095/float(MaxValue)) - 1
+
         chirpWave = np.append(chirpWave,segment)
 
         #final flash back to dark
-        segment = np.zeros(int(round(1./ifi)))
+        if gammaCorrected == 1:
+            segment = np.full(int(round(1./ifi)),bgnd)
+        else:
+            segment = np.full(int(round(1./ifi)),bgndRaw)
+
         chirpWave = np.append(chirpWave,segment)
 
-        segment = np.full(int(round(1./ifi)),-contrast)
-        chirpWave = np.append(chirpWave,segment)
+        # segment = np.full(int(round(1./ifi)),-contrast)
+        # chirpWave = np.append(chirpWave,segment)
 
         return chirpWave
 
@@ -2320,23 +4307,44 @@ class App(QMainWindow):
     def getIntensity(self,i):
         bgnd = float(self.background.text())
 
-        #print(i)
+        MaxValue = 2**BitDepth - 1
+
         if stim[i]['contrastType'] == 'Michelson':
+            
+            if bgnd == 0:
+                # bgnd = 127
+                if BitDepth == 8:
+                    bgnd = 127
+                else:
+                    bgnd = 2047
+
+            if stim[i]['contrast'] > 100:
+                stim[i]['contrast'] = 100
+            elif stim[i]['contrast'] < -100:
+                stim[i]['contrast'] = -100
+                
             firstIntensity = bgnd + bgnd * (stim[i]['contrast']/100.0)
             secondIntensity = bgnd - bgnd * (stim[i]['contrast']/100.0)
 
             #all situations of out of bounds intensities
-            if firstIntensity > 255.0: #out of range, set to maximum
-                firstIntensity = 255.0
-                secondIntensity = bgnd - (255.0 - bgnd) #same amount below background as light is above background
+            # if firstIntensity > 255.0: #out of range, set to maximum
+            #     firstIntensity = 255.0
+            #     secondIntensity = bgnd - (255.0 - bgnd) #same amount below background as light is above background
+            if firstIntensity > MaxValue:
+                firstIntensity = MaxValue
+                secondIntensity = bgnd - (MaxValue - bgnd) #same amount below background as light is above background
             elif secondIntensity < 0:
                 secondIntensity = 0 #out of range, set to minimum
                 firstIntensity = 2 * bgnd #set to 100% contrast
 
                 #reverse case, where firstIntensity is dark
-            elif secondIntensity > 255.0:
-                secondIntensity = 255.0
-                firstIntensity = bgnd - (255.0 - bgnd)
+            # elif secondIntensity > 255.0:
+            #     secondIntensity = 255.0
+            #     firstIntensity = bgnd - (255.0 - bgnd)
+            elif secondIntensity > MaxValue:
+                secondIntensity = MaxValue
+                firstIntensity = bgnd - (MaxValue - bgnd)
+
             elif firstIntensity < 0:
                 secondIntensity = 0
                 secondIntensity = 2 * bgnd
@@ -2347,8 +4355,10 @@ class App(QMainWindow):
             secondIntensity = bgnd
 
             #out of bounds intensities
-            if firstIntensity > 255.0:
-                firstIntensity = 255.0
+            # if firstIntensity > 255.0:
+            #     firstIntensity = 255.0
+            if firstIntensity > MaxValue:
+                firstIntensity = MaxValue
             elif firstIntensity < 0:
                 firstIntensity = 0
 
@@ -2357,14 +4367,24 @@ class App(QMainWindow):
             secondIntensity = bgnd
 
             #out of bounds intensities
-            if firstIntensity > 255.0:
-                firstIntensity = 255.0
+            # if firstIntensity > 255.0:
+            #     firstIntensity = 255.0
+            if firstIntensity > MaxValue:
+                firstIntensity = MaxValue
             elif firstIntensity < 0:
                 firstIntensity = 0
 
+        #apply gamma correction for whatever gamma table is loaded
+        firstIntensity = gammaTable[int(firstIntensity)]
+        secondIntensity = gammaTable[int(secondIntensity)]
+        
         #Convert from 0-255 to -1 to 1 range
-        firstIntensity = (2 * firstIntensity/255.0) - 1
-        secondIntensity = (2 * secondIntensity/255.0) - 1
+        # firstIntensity = (2 * firstIntensity/255.0) - 1
+        # secondIntensity = (2 * secondIntensity/255.0) - 1
+
+        #Convert from 0-4095 to -1 to 1 range
+        firstIntensity = (2 * firstIntensity/float(MaxValue)) - 1
+        secondIntensity = (2 * secondIntensity/float(MaxValue)) - 1
 
         return (firstIntensity,secondIntensity)
 
@@ -2372,6 +4392,21 @@ class App(QMainWindow):
     def abortStim(self):
         global abortStatus
         abortStatus = 1
+
+        self.stimCountDown.setText('')
+        self.sweepMonitor.setText('')
+
+        #send the stop TTL signal out of pin 3
+        # port = parallel.ParallelPort(address = 0xE010)
+        # port.setPin(3,1)
+        # port.setPin(3,0)
+
+    def triggerEphys(self):
+         #send the stop TTL signal out of pin 3
+        port = parallel.ParallelPort(address = 0xE010)
+        port.setPin(3,1)
+        sleep(0.5)
+        port.setPin(3,0)
 
     #Adds another stimulus dictionary for the new object
     def addStimDict(self):
@@ -2398,6 +4433,7 @@ class App(QMainWindow):
         'spatialPhase':0,
         'angularCycles':0,
         'orientation':0,
+        'objectAperture':0,
         'contrastType':'Weber',
         'contrast':0,
         'modulationType':'Static',
@@ -2408,6 +4444,7 @@ class App(QMainWindow):
         'driftFreq':0,
         'startRad':0,
         'angle':0,
+        'walkFreq':0,
         'apertureStatus':'Off',
         'apertureDiam':0,
         'maskCoordinateType':'Cartesian',
@@ -2417,12 +4454,15 @@ class App(QMainWindow):
         'maskYPos':0,
         'maskPolarRadius':0,
         'maskPolarAngle':0,
-        'apertureStatus':'Off',
-        'apertureDiam':0,
         'noiseType':'Binary',
         'noiseSize':0,
         'noiseSeed':0,
-        'noiseFreq':0,
+        'numDots':0,
+        'dotCoherence':0,
+        'signalDirection':0,
+        'noiseDirection':0,
+        'PositionalShiftType':'Static',
+        'TargetResolution':0,
         'cloudSF':0,
         'cloudSFBand':0,
         'cloudSpeedX':0,
@@ -2467,6 +4507,16 @@ class App(QMainWindow):
         'orientationSeq':{
             'control':self.orientationSeq,
             'parent':'orientation',
+            'sequence':'None'
+            },
+        'pixelWidthSeq':{
+            'control':self.pixelWidthSeq,
+            'parent':'pixelWidth',
+            'sequence':'None'
+        },
+        'objectApertureSeq':{
+            'control':self.objectApertureSeq,
+            'parent':'objectAperture',
             'sequence':'None'
             },
         'spatialFreqSeq':{
@@ -2544,11 +4594,31 @@ class App(QMainWindow):
             'parent':'noiseSeed',
             'sequence':'None'
         },
-        'noiseFreqSeq':{
-            'control':self.noiseFreqSeq,
-            'parent':'noiseFreq',
+        'numDotsSeq':{
+            'control':self.numDotsSeq,
+            'parent':'numDots',
             'sequence':'None'
-        },
+            },
+        'dotCoherenceSeq':{
+            'control':self.dotCoherenceSeq,
+            'parent':'dotCoherence',
+            'sequence':'None'
+            },
+        'signalDirectionSeq':{
+            'control':self.signalDirectionSeq,
+            'parent':'signalDirection',
+            'sequence':'None'
+            },
+        'noiseDirectionSeq':{
+            'control':self.noiseDirectionSeq,
+            'parent':'noiseDirection',
+            'sequence':'None'
+            },   
+        'TargetResolutionSeq':{
+            'control':self.TargetResolutionSeq,
+            'parent':'TargetResolution',
+            'sequence':'None'
+            },  
         'delaySeq':{
             'control':self.delaySeq,
             'parent':'delay',
@@ -2591,6 +4661,102 @@ class App(QMainWindow):
             }
         }
 
+    #Initializes the dictionary that holds the global settings
+    def setGlobalSettingsDict(self):
+        global globalSettings
+
+        globalSettings = {
+            'monitor':self.monitor.currentText(),
+            'ppm':self.ppm.text(),
+            'xOffset':self.xOffset.text(),
+            'yOffset':self.yOffset.text(),
+            'background':self.background.text(),
+            'syncFrames':self.syncFrames.text(),
+            'syncSpot':self.syncSpot.isChecked(),
+            'gammaTable':self.gammaTable.currentText(),
+            'triggerInterface':'Parallel Port',
+            'parallelPortAddress':'0xE010',
+            'digitalIn':'2',
+            'digitalOut':'2'
+        } 
+
+    #Loads the global settings from the User's stimulus folder
+    def loadGlobalSettings(self):
+        global globalSettings
+
+        fileName = 'settings.globals'
+        subfolder = self.subFolder.currentText()
+        path = stimPath + subfolder + '/' + fileName
+
+        if os.path.exists(path):
+            #open and read stimulus file to dictionaries
+            with open(path,'r') as file:
+                fileStr = file.read()
+
+                #load in the settings to the global settings dictionary
+                globalSettings = json.loads(fileStr)
+        else:
+            #make a global settings file if one doesn't exist already
+            with open(path,'w+') as file:
+                print("Creating Global Settings file...")
+                settings = json.dumps(globalSettings)
+                file.write(settings)
+
+        #update the controls with the global settings
+
+        self.monitor.setCurrentText(str(globalSettings['monitor']))
+        self.ppm.setText(str(globalSettings['ppm']))
+        self.xOffset.setText(str(int(globalSettings['xOffset'])))
+        self.yOffset.setText(str(int(globalSettings['yOffset'])))
+        self.background.setText(str(int(globalSettings['background'])))
+        self.syncFrames.setText(str(int(globalSettings['syncFrames'])))
+        self.syncSpot.setChecked(globalSettings['syncSpot'])
+        self.gammaTable.setCurrentText(str(globalSettings['gammaTable']))
+
+    #prints that the settings file is being saved before saving it
+    def saveGlobalSettings_Verbose(self):
+        print("Saving Global Settings file...")
+        self.saveGlobalSettings()
+         
+    #Saves the current global settings to a .globals file
+    def saveGlobalSettings(self):
+        fileName = 'settings.globals'
+        subfolder = self.subFolder.currentText()
+        path = stimPath + subfolder + '/' + fileName
+
+        with open(path,'w+') as file:
+
+            settings = json.dumps(globalSettings)
+            file.write(settings)
+
+    #Creates a new stimulus folder for a new user profile
+    def createNewUser(self):
+        subfolder, ok = QInputDialog.getText(self, 'New User','User Name:')#,QLineEdit.Normal,stimName)
+
+        if ok == False:
+            return
+
+        path = stimPath + subfolder
+
+        #if user profile already exists
+        if os.path.exists(path):
+            error_dialog = QErrorMessage()
+            error_dialog.showMessage('User name is already in use, try a different one.')
+            error_dialog.exec_()
+            return
+
+        #Make the profile and switch to it's stimulus bank
+        os.mkdir(path)
+        self.subFolder.addItem(subfolder)
+        self.subFolder.setCurrentText(subfolder)
+
+        #update global settings dictionary with current values
+        self.setGlobalSettingsDict()
+        #save the global settings to the new user profile
+        self.saveGlobalSettings()
+        #load the profile
+        self.loadUserProfile(subfolder)
+
     #Makes a dictionary containing string references to all the GUI objects
     def setControlDict(self):
         global control
@@ -2623,6 +4789,7 @@ class App(QMainWindow):
         'diameterLabel':self.diameterLabel,
         'diameterSeq':self.diameterSeq,
         'imagePath':self.imagePath,
+        'framePath':self.framePath,
         'innerDiameter':self.innerDiameter,
         'innerDiameterLabel':self.innerDiameterLabel,
         'innerDiameterSeq':self.innerDiameterSeq,
@@ -2647,6 +4814,12 @@ class App(QMainWindow):
         'orientation':self.orientation,
         'orientationLabel':self.orientationLabel,
         'orientationSeq':self.orientationSeq,
+        'pixelWidth':self.pixelWidth,
+        'pixelWidthLabel':self.pixelWidthLabel,
+        'pixelWidthSeq':self.pixelWidthSeq,
+        'objectAperture':self.objectAperture,
+        'objectApertureLabel':self.objectApertureLabel,
+        'objectApertureSeq':self.objectApertureSeq,
         'contrastType':self.contrastType,
         'contrast':self.contrast,
         'contrastLabel':self.contrastLabel,
@@ -2669,7 +4842,9 @@ class App(QMainWindow):
         'angle':self.angle,
         'angleLabel':self.angleLabel,
         'angleSeq':self.angleSeq,
-        'coordinateType':self.coordinateType,
+        'walkFreq':self.walkFreq,
+        'walkFreqLabel':self.walkFreqLabel,
+        'walkFreqSeq':self.walkFreqSeq,
         'xOffset':self.xOffset,
         'yOffset':self.yOffset,
         'apertureLabel':self.apertureLabel,
@@ -2723,731 +4898,466 @@ class App(QMainWindow):
         'noiseSeedLabel':self.noiseSeedLabel,
         'noiseSeed':self.noiseSeed,
         'noiseSeedSeq':self.noiseSeedSeq,
-        'noiseFreqLabel':self.noiseFreqLabel,
-        'noiseFreq':self.noiseFreq,
-        'noiseFreqSeq':self.noiseFreqSeq,
+        # 'noiseFreqLabel':self.noiseFreqLabel,
+        # 'noiseFreq':self.noiseFreq,
+        # 'noiseFreqSeq':self.noiseFreqSeq,
         'batchStimMenu':self.batchStimMenu,
         'batchStimList':self.batchStimList,
         'batchStimAdd':self.batchStimAdd,
-        'batchStimRemove':self.batchStimRemove
+        'batchStimRemove':self.batchStimRemove,
+        'numDots':self.numDots,
+        'numDotsLabel':self.numDotsLabel,
+        'numDotsSeq':self.numDotsSeq,
+        'dotCoherence':self.dotCoherence,
+        'dotCoherenceLabel':self.dotCoherenceLabel,
+        'dotCoherenceSeq':self.dotCoherenceSeq,
+        'signalDirection':self.signalDirection,
+        'signalDirectionLabel':self.signalDirectionLabel,
+        'signalDirectionSeq':self.signalDirectionSeq,
+        'noiseDirection':self.noiseDirection,
+        'noiseDirectionLabel':self.noiseDirectionLabel,
+        'noiseDirectionSeq':self.noiseDirectionSeq,
+        'PositionalShiftType':self.PositionalShiftType,
+        'TargetResolution':self.TargetResolution,
+        'TargetResolutionLabel':self.TargetResolutionLabel,
+        'TargetResolutionSeq':self.TargetResolutionSeq
         }
 
     #Set contextual menu dictionaries
     def setContextualMenus(self):
-        global circleSettings,rectangleSettings,gratingSettings,noiseSettings,cloudSettings,windmillSettings,annulusSettings,imageSettings,batchSettings,snakeSettings
-        global staticMotionSettings,dynamicModSettings,staticModSettings,windmillMotionSettings,driftGratingMotionSettings,driftMotionSettings
-        global cartesianSettings,cartesianMaskSettings,polarSettings,polarMaskSettings
+        global circleSettings,rectangleSettings,gratingSettings,checkerboardSettings,checkerboard1DSettings,cloudSettings,windmillSettings,annulusSettings,imageSettings,frameSettings,batchSettings,snakeSettings
+        global staticMotionSettings,randomWalkMotionSettings,randomWalkGratingMotionSettings,dynamicModSettings,noiseModSettings,staticModSettings,windmillMotionSettings,driftGratingMotionSettings,driftMotionSettings
+        global cartesianSettings,cartesianMaskSettings,polarSettings,polarMaskSettings,randomDotSettings,randomDotMotionSettings,randomPositionalShiftSettings,staticPositionalShiftSettings
+        global allSettings,allCoordinateMaskSettings,allCoordinateSettings,allModulationSettings,allMotionSettings,allPositionalShiftSettings
+        
+        #First few lists contain all of the controls in different categories: Overall, Motion, Modulation, Coordinates.
+        #These lists are iterated over to match up controls that are included in lists for individual object types (Circles, rectangles, gratings, etc.)
+        #or types of Motion (Drift, Static, etc.), Modulation (Square, Sine, Chirp, etc.), or Coordinate sytems (Cartesian, polar). 
+        
+        #Adding a new type of stimulus object will involve adding those controls to the allSettings list if new controls have been created (e.g. in BuildDesignPanel() ),
+        #and creating a new settings list for that object, which lists out the controls to use for that object type.
 
-        circleSettings = {
-        'gratingType':0,
-        'diameter':1,
-        'diameterLabel':1,
-        'diameterSeq':1,
-        'imagePath':0,
-        'innerDiameter':0,
-        'innerDiameterLabel':0,
-        'innerDiameterSeq':0,
-        'outerDiameter':0,
-        'outerDiameterLabel':0,
-        'outerDiameterSeq':0,
-        'length':0,
-        'lengthLabel':0,
-        'lengthSeq':0,
-        'width':0,
-        'widthLabel':0,
-        'widthSeq':0,
-        'orientation':0,
-        'orientationLabel':0,
-        'orientationSeq':0,
-        'angularCyclesLabel':0,
-        'angularCycles':0,
-        'angularCyclesSeq':0,
-        'spatialPhase':0,
-        'spatialPhaseLabel':0,
-        'spatialPhaseSeq':0,
-        'spatialFreq':0,
-        'spatialFreqLabel':0,
-        'spatialFreqSeq':0,
-        'noiseType':0,
-        'noiseSeedLabel':0,
-        'noiseSeed':0,
-        'noiseSeedSeq':0,
-        'noiseSizeLabel':0,
-        'noiseSize':0,
-        'noiseSizeSeq':0,
-        'noiseFreqLabel':0,
-        'noiseFreq':0,
-        'noiseFreqSeq':0,
-        'cloudSFLabel':0,
-        'cloudSF':0,
-        'cloudSFBand':0,
-        'cloudSpeedLabel':0,
-        'cloudSpeedX':0,
-        'cloudSpeedY':0,
-        'cloudSpeedBandLabel':0,
-        'cloudSpeedBand':0,
-        'cloudOrientLabel':0,
-        'cloudOrient':0,
-        'cloudOrientBand':0,
-        'batchStimMenu':0,
-        'batchStimList':0,
-        'batchStimAdd':0,
-        'batchStimRemove':0
-        }
+        allSettings = [
+            'gratingType',
+            'diameter',
+            'diameterLabel',
+            'diameterSeq',
+            'imagePath',
+            'framePath',
+            'innerDiameter',
+            'innerDiameterLabel',
+            'innerDiameterSeq',
+            'outerDiameter',
+            'outerDiameterLabel',
+            'outerDiameterSeq',
+            'length',
+            'lengthLabel',
+            'lengthSeq',
+            'width',
+            'widthLabel',
+            'widthSeq',
+            'orientation',
+            'orientationLabel',
+            'orientationSeq',
+            'pixelWidth',
+            'pixelWidthLabel',
+            'pixelWidthSeq',
+            'objectAperture',
+            'objectAperture',
+            'objectApertureLabel',
+            'objectApertureSeq',
+            'angularCyclesLabel',
+            'angularCycles',
+            'angularCyclesSeq',
+            'spatialPhase',
+            'spatialPhaseLabel',
+            'spatialPhaseSeq',
+            'spatialFreq',
+            'spatialFreqLabel',
+            'spatialFreqSeq',
+            'noiseType',
+            'noiseSizeLabel',
+            'noiseSize',
+            'noiseSizeSeq',
+            'cloudSFLabel',
+            'cloudSF',
+            'cloudSFBand',
+            'cloudSpeedLabel',
+            'cloudSpeedX',
+            'cloudSpeedY',
+            'cloudSpeedBandLabel',
+            'cloudSpeedBand',
+            'cloudOrientLabel',
+            'cloudOrient',
+            'cloudOrientBand',
+            'batchStimMenu',
+            'batchStimList',
+            'batchStimAdd',
+            'batchStimRemove',
+            'numDots',
+            'numDotsLabel',
+            'numDotsSeq',
+            'dotCoherence',
+            'dotCoherenceLabel',
+            'dotCoherenceSeq',
+            'PositionalShiftType'
+        ]
 
-        annulusSettings = {
-        'gratingType':0,
-        'diameter':0,
-        'diameterLabel':0,
-        'diameterSeq':0,
-        'imagePath':0,
-        'innerDiameter':1,
-        'innerDiameterLabel':1,
-        'innerDiameterSeq':1,
-        'outerDiameter':1,
-        'outerDiameterLabel':1,
-        'outerDiameterSeq':1,
-        'length':0,
-        'lengthLabel':0,
-        'lengthSeq':0,
-        'width':0,
-        'widthLabel':0,
-        'widthSeq':0,
-        'orientation':0,
-        'orientationLabel':0,
-        'orientationSeq':0,
-        'angularCyclesLabel':0,
-        'angularCycles':0,
-        'angularCyclesSeq':0,
-        'spatialPhase':0,
-        'spatialPhaseLabel':0,
-        'spatialPhaseSeq':0,
-        'spatialFreq':0,
-        'spatialFreqLabel':0,
-        'spatialFreqSeq':0,
-        'noiseType':0,
-        'noiseSeedLabel':0,
-        'noiseSeed':0,
-        'noiseSeedSeq':0,
-        'noiseSizeLabel':0,
-        'noiseSize':0,
-        'noiseSizeSeq':0,
-        'noiseFreqLabel':0,
-        'noiseFreq':0,
-        'noiseFreqSeq':0,
-        'cloudSFLabel':0,
-        'cloudSF':0,
-        'cloudSFBand':0,
-        'cloudSpeedLabel':0,
-        'cloudSpeedX':0,
-        'cloudSpeedY':0,
-        'cloudSpeedBandLabel':0,
-        'cloudSpeedBand':0,
-        'cloudOrientLabel':0,
-        'cloudOrient':0,
-        'cloudOrientBand':0,
-        'batchStimMenu':0,
-        'batchStimList':0,
-        'batchStimAdd':0,
-        'batchStimRemove':0
-        }
+        allMotionSettings = [
+            'angle',
+            'angleLabel',
+            'angleSeq',
+            'startRad',
+            'startRadLabel',
+            'startRadSeq',
+            'speed',
+            'speedLabel',
+            'speedSeq',
+            'driftFreqLabel',
+            'driftFreq',
+            'driftFreqSeq',
+            'turnDirection',
+            'walkFreq',
+            'walkFreqLabel',
+            'walkFreqSeq',
+            'signalDirection',
+            'signalDirectionLabel',
+            'signalDirectionSeq',
+            'noiseDirection',
+            'noiseDirectionLabel',
+            'noiseDirectionSeq'
+        ]
+    
+        allModulationSettings = [
+            'modulationFreq',
+            'modulationFreqLabel',
+            'modulationFreqSeq',
+            'noiseSeedLabel',
+            'noiseSeed',
+            'noiseSeedSeq'
+        ]
+        
+        allCoordinateSettings = [
+            'xPos',
+            'xPosLabel',
+            'xPosSeq',
+            'yPos',
+            'yPosLabel',
+            'yPosSeq',
+            'polarRadius',
+            'polarRadiusLabel',
+            'polarRadiusSeq',
+            'polarAngle',
+            'polarAngleLabel',
+            'polarAngleSeq'
+        ]
 
-        rectangleSettings = {
-        'gratingType':0,
-        'diameter':0,
-        'diameterLabel':0,
-        'diameterSeq':0,
-        'imagePath':0,
-        'innerDiameter':0,
-        'innerDiameterLabel':0,
-        'innerDiameterSeq':0,
-        'outerDiameter':0,
-        'outerDiameterLabel':0,
-        'outerDiameterSeq':0,
-        'length':1,
-        'lengthLabel':1,
-        'lengthSeq':1,
-        'width':1,
-        'widthLabel':1,
-        'widthSeq':1,
-        'orientation':1,
-        'orientationLabel':1,
-        'orientationSeq':1,
-        'angularCyclesLabel':0,
-        'angularCycles':0,
-        'angularCyclesSeq':0,
-        'spatialPhase':0,
-        'spatialPhaseLabel':0,
-        'spatialPhaseSeq':0,
-        'spatialFreq':0,
-        'spatialFreqLabel':0,
-        'spatialFreqSeq':0,
-        'noiseType':0,
-        'noiseSeedLabel':0,
-        'noiseSeed':0,
-        'noiseSeedSeq':0,
-        'noiseSizeLabel':0,
-        'noiseSize':0,
-        'noiseSizeSeq':0,
-        'noiseFreqLabel':0,
-        'noiseFreq':0,
-        'noiseFreqSeq':0,
-        'cloudSFLabel':0,
-        'cloudSF':0,
-        'cloudSFBand':0,
-        'cloudSpeedLabel':0,
-        'cloudSpeedX':0,
-        'cloudSpeedY':0,
-        'cloudSpeedBandLabel':0,
-        'cloudSpeedBand':0,
-        'cloudOrientLabel':0,
-        'cloudOrient':0,
-        'cloudOrientBand':0,
-        'batchStimMenu':0,
-        'batchStimList':0,
-        'batchStimAdd':0,
-        'batchStimRemove':0
-        }
+        allCoordinateMaskSettings = [
+            'maskXPos',
+            'maskXPosLabel',
+            'maskXPosSeq',
+            'maskYPos',
+            'maskYPosLabel',
+            'maskYPosSeq',
+            'maskPolarRadius',
+            'maskPolarRadiusLabel',
+            'maskPolarRadiusSeq',
+            'maskPolarAngle',
+            'maskPolarAngleLabel',
+            'maskPolarAngleSeq'
+        ]
 
-        snakeSettings = {
-        'gratingType':0,
-        'diameter':0,
-        'diameterLabel':0,
-        'diameterSeq':0,
-        'imagePath':0,
-        'innerDiameter':0,
-        'innerDiameterLabel':0,
-        'innerDiameterSeq':0,
-        'outerDiameter':0,
-        'outerDiameterLabel':0,
-        'outerDiameterSeq':0,
-        'length':1,
-        'lengthLabel':1,
-        'lengthSeq':1,
-        'width':1,
-        'widthLabel':1,
-        'widthSeq':1,
-        'orientation':0,
-        'orientationLabel':0,
-        'orientationSeq':0,
-        'angularCyclesLabel':0,
-        'angularCycles':0,
-        'angularCyclesSeq':0,
-        'spatialPhase':0,
-        'spatialPhaseLabel':0,
-        'spatialPhaseSeq':0,
-        'spatialFreq':0,
-        'spatialFreqLabel':0,
-        'spatialFreqSeq':0,
-        'noiseType':0,
-        'noiseSeedLabel':0,
-        'noiseSeed':0,
-        'noiseSeedSeq':0,
-        'noiseSizeLabel':0,
-        'noiseSize':0,
-        'noiseSizeSeq':0,
-        'noiseFreqLabel':0,
-        'noiseFreq':0,
-        'noiseFreqSeq':0,
-        'cloudSFLabel':0,
-        'cloudSF':0,
-        'cloudSFBand':0,
-        'cloudSpeedLabel':0,
-        'cloudSpeedX':0,
-        'cloudSpeedY':0,
-        'cloudSpeedBandLabel':0,
-        'cloudSpeedBand':0,
-        'cloudOrientLabel':0,
-        'cloudOrient':0,
-        'cloudOrientBand':0,
-        'batchStimMenu':0,
-        'batchStimList':0,
-        'batchStimAdd':0,
-        'batchStimRemove':0
-        }
+        allPositionalShiftSettings = [
+            'TargetResolution',
+            'TargetResolutionLabel',
+            'TargetResolutionSeq'
+        ]
+        ########################################
+        ########################################
+        #Individual object types each have their own lists of controls
+        circleSettings = [
+            'diameter',
+            'diameterLabel',
+            'diameterSeq'
+        ]
 
-        gratingSettings = {
-        'gratingType':1,
-        'diameter':0,
-        'diameterLabel':0,
-        'diameterSeq':0,
-        'imagePath':0,
-        'innerDiameter':0,
-        'innerDiameterLabel':0,
-        'innerDiameterSeq':0,
-        'outerDiameter':0,
-        'outerDiameterLabel':0,
-        'outerDiameterSeq':0,
-        'length':0,
-        'lengthLabel':0,
-        'lengthSeq':0,
-        'width':0,
-        'widthLabel':0,
-        'widthSeq':0,
-        'orientation':1,
-        'orientationLabel':1,
-        'orientationSeq':1,
-        'angularCyclesLabel':0,
-        'angularCycles':0,
-        'angularCyclesSeq':0,
-        'spatialPhase':1,
-        'spatialPhaseLabel':1,
-        'spatialPhaseSeq':1,
-        'spatialFreq':1,
-        'spatialFreqLabel':1,
-        'spatialFreqSeq':1,
-        'noiseType':0,
-        'noiseSeedLabel':0,
-        'noiseSeed':0,
-        'noiseSeedSeq':0,
-        'noiseSizeLabel':0,
-        'noiseSize':0,
-        'noiseSizeSeq':0,
-        'noiseFreqLabel':0,
-        'noiseFreq':0,
-        'noiseFreqSeq':0,
-        'cloudSFLabel':0,
-        'cloudSF':0,
-        'cloudSFBand':0,
-        'cloudSpeedLabel':0,
-        'cloudSpeedX':0,
-        'cloudSpeedY':0,
-        'cloudSpeedBandLabel':0,
-        'cloudSpeedBand':0,
-        'cloudOrientLabel':0,
-        'cloudOrient':0,
-        'cloudOrientBand':0,
-        'batchStimMenu':0,
-        'batchStimList':0,
-        'batchStimAdd':0,
-        'batchStimRemove':0
-        }
+        annulusSettings = [
+            'innerDiameter',
+            'innerDiameterLabel',
+            'innerDiameterSeq',
+            'outerDiameter',
+            'outerDiameterLabel',
+            'outerDiameterSeq'
+        ]
 
-        noiseSettings = {
-        'gratingType':0,
-        'diameter':0,
-        'diameterLabel':0,
-        'diameterSeq':0,
-        'imagePath':0,
-        'innerDiameter':0,
-        'innerDiameterLabel':0,
-        'innerDiameterSeq':0,
-        'outerDiameter':0,
-        'outerDiameterLabel':0,
-        'outerDiameterSeq':0,
-        'length':0,
-        'lengthLabel':0,
-        'lengthSeq':0,
-        'width':0,
-        'widthLabel':0,
-        'widthSeq':0,
-        'orientation':0,
-        'orientationLabel':0,
-        'orientationSeq':0,
-        'angularCyclesLabel':0,
-        'angularCycles':0,
-        'angularCyclesSeq':0,
-        'spatialPhase':0,
-        'spatialPhaseLabel':0,
-        'spatialPhaseSeq':0,
-        'spatialFreq':0,
-        'spatialFreqLabel':0,
-        'spatialFreqSeq':0,
-        'noiseType':1,
-        'noiseSeedLabel':1,
-        'noiseSeed':1,
-        'noiseSeedSeq':1,
-        'noiseSizeLabel':1,
-        'noiseSize':1,
-        'noiseSizeSeq':1,
-        'noiseFreqLabel':1,
-        'noiseFreq':1,
-        'noiseFreqSeq':1,
-        'cloudSFLabel':0,
-        'cloudSF':0,
-        'cloudSFBand':0,
-        'cloudSpeedLabel':0,
-        'cloudSpeedX':0,
-        'cloudSpeedY':0,
-        'cloudSpeedBandLabel':0,
-        'cloudSpeedBand':0,
-        'cloudOrientLabel':0,
-        'cloudOrient':0,
-        'cloudOrientBand':0,
-        'batchStimMenu':0,
-        'batchStimList':0,
-        'batchStimAdd':0,
-        'batchStimRemove':0
-        }
+        rectangleSettings = [
+            'length',
+            'lengthLabel',
+            'lengthSeq',
+            'width',
+            'widthLabel',
+            'widthSeq',
+            'orientation',
+            'orientationLabel',
+            'orientationSeq'
+        ]
 
-        cloudSettings = {
-        'gratingType':0,
-        'diameter':0,
-        'diameterLabel':0,
-        'diameterSeq':0,
-        'imagePath':0,
-        'innerDiameter':0,
-        'innerDiameterLabel':0,
-        'innerDiameterSeq':0,
-        'outerDiameter':0,
-        'outerDiameterLabel':0,
-        'outerDiameterSeq':0,
-        'length':0,
-        'lengthLabel':0,
-        'lengthSeq':0,
-        'width':0,
-        'widthLabel':0,
-        'widthSeq':0,
-        'orientation':0,
-        'orientationLabel':0,
-        'orientationSeq':0,
-        'angularCyclesLabel':0,
-        'angularCycles':0,
-        'angularCyclesSeq':0,
-        'spatialPhase':0,
-        'spatialPhaseLabel':0,
-        'spatialPhaseSeq':0,
-        'spatialFreq':0,
-        'spatialFreqLabel':0,
-        'spatialFreqSeq':0,
-        'noiseType':0,
-        'noiseSeedLabel':0,
-        'noiseSeed':0,
-        'noiseSeedSeq':0,
-        'noiseSizeLabel':0,
-        'noiseSize':0,
-        'noiseSizeSeq':0,
-        'noiseFreqLabel':0,
-        'noiseFreq':0,
-        'noiseFreqSeq':0,
-        'cloudSFLabel':1,
-        'cloudSF':1,
-        'cloudSFBand':1,
-        'cloudSpeedLabel':1,
-        'cloudSpeedX':1,
-        'cloudSpeedY':1,
-        'cloudSpeedBandLabel':1,
-        'cloudSpeedBand':1,
-        'cloudOrientLabel':1,
-        'cloudOrient':1,
-        'cloudOrientBand':1,
-        'batchStimMenu':0,
-        'batchStimList':0,
-        'batchStimAdd':0,
-        'batchStimRemove':0
-        }
+        snakeSettings = [
+            'length',
+            'lengthLabel',
+            'lengthSeq',
+            'width',
+            'widthLabel',
+            'widthSeq'
+        ]
 
-        windmillSettings = {
-        'gratingType':1,
-        'diameter':0,
-        'diameterLabel':0,
-        'diameterSeq':0,
-        'imagePath':0,
-        'innerDiameter':0,
-        'innerDiameterLabel':0,
-        'innerDiameterSeq':0,
-        'outerDiameter':0,
-        'outerDiameterLabel':0,
-        'outerDiameterSeq':0,
-        'length':0,
-        'lengthLabel':0,
-        'lengthSeq':0,
-        'width':0,
-        'widthLabel':0,
-        'widthSeq':0,
-        'orientation':1,
-        'orientationLabel':1,
-        'orientationSeq':1,
-        'angularCyclesLabel':1,
-        'angularCycles':1,
-        'angularCyclesSeq':1,
-        'spatialPhase':0,
-        'spatialPhaseLabel':0,
-        'spatialPhaseSeq':0,
-        'spatialFreq':0,
-        'spatialFreqLabel':0,
-        'spatialFreqSeq':0,
-        'noiseType':0,
-        'noiseSeedLabel':0,
-        'noiseSeed':0,
-        'noiseSeedSeq':0,
-        'noiseSizeLabel':0,
-        'noiseSize':0,
-        'noiseSizeSeq':0,
-        'noiseFreqLabel':0,
-        'noiseFreq':0,
-        'noiseFreqSeq':0,
-        'cloudSFLabel':0,
-        'cloudSF':0,
-        'cloudSFBand':0,
-        'cloudSpeedLabel':0,
-        'cloudSpeedX':0,
-        'cloudSpeedY':0,
-        'cloudSpeedBandLabel':0,
-        'cloudSpeedBand':0,
-        'cloudOrientLabel':0,
-        'cloudOrient':0,
-        'cloudOrientBand':0,
-        'batchStimMenu':0,
-        'batchStimList':0,
-        'batchStimAdd':0,
-        'batchStimRemove':0
-        }
+        gratingSettings = [
+            'gratingType',
+            'orientation',
+            'orientationLabel',
+            'orientationSeq',
+            'objectAperture',
+            'objectApertureLabel',
+            'objectApertureSeq',
+            'spatialPhase',
+            'spatialPhaseLabel',
+            'spatialPhaseSeq',
+            'spatialFreq',
+            'spatialFreqLabel',
+            'spatialFreqSeq'
+        ]
 
-        imageSettings = {
-        'gratingType':0,
-        'diameter':0,
-        'diameterLabel':0,
-        'diameterSeq':0,
-        'imagePath':1,
-        'innerDiameter':0,
-        'innerDiameterLabel':0,
-        'innerDiameterSeq':0,
-        'outerDiameter':0,
-        'outerDiameterLabel':0,
-        'outerDiameterSeq':0,
-        'length':0,
-        'lengthLabel':0,
-        'lengthSeq':0,
-        'width':0,
-        'widthLabel':0,
-        'widthSeq':0,
-        'orientation':1,
-        'orientationLabel':1,
-        'orientationSeq':1,
-        'angularCyclesLabel':0,
-        'angularCycles':0,
-        'angularCyclesSeq':0,
-        'spatialPhase':0,
-        'spatialPhaseLabel':0,
-        'spatialPhaseSeq':0,
-        'spatialFreq':0,
-        'spatialFreqLabel':0,
-        'spatialFreqSeq':0,
-        'noiseType':0,
-        'noiseSeedLabel':0,
-        'noiseSeed':0,
-        'noiseSeedSeq':0,
-        'noiseSizeLabel':0,
-        'noiseSize':0,
-        'noiseSizeSeq':0,
-        'noiseFreqLabel':0,
-        'noiseFreq':0,
-        'noiseFreqSeq':0,
-        'cloudSFLabel':0,
-        'cloudSF':0,
-        'cloudSFBand':0,
-        'cloudSpeedLabel':0,
-        'cloudSpeedX':0,
-        'cloudSpeedY':0,
-        'cloudSpeedBandLabel':0,
-        'cloudSpeedBand':0,
-        'cloudOrientLabel':0,
-        'cloudOrient':0,
-        'cloudOrientBand':0,
-        'batchStimMenu':0,
-        'batchStimList':0,
-        'batchStimAdd':0,
-        'batchStimRemove':0
-        }
+        checkerboardSettings = [
+            'noiseType',
+            'noiseSizeLabel',
+            'noiseSize',
+            'noiseSizeSeq',
+            'PositionalShiftType',
+            'TargetResolution',
+            'TargetResolutionLabel',
+            'TargetResolutionSeq',
+            'objectAperture',
+            'objectApertureLabel',
+            'objectApertureSeq'
+        ]
 
-        batchSettings = {
-        'gratingType':0,
-        'diameter':0,
-        'diameterLabel':0,
-        'diameterSeq':0,
-        'imagePath':0,
-        'innerDiameter':0,
-        'innerDiameterLabel':0,
-        'innerDiameterSeq':0,
-        'outerDiameter':0,
-        'outerDiameterLabel':0,
-        'outerDiameterSeq':0,
-        'length':0,
-        'lengthLabel':0,
-        'lengthSeq':0,
-        'width':0,
-        'widthLabel':0,
-        'widthSeq':0,
-        'orientation':0,
-        'orientationLabel':0,
-        'orientationSeq':0,
-        'angularCyclesLabel':0,
-        'angularCycles':0,
-        'angularCyclesSeq':0,
-        'spatialPhase':0,
-        'spatialPhaseLabel':0,
-        'spatialPhaseSeq':0,
-        'spatialFreq':0,
-        'spatialFreqLabel':0,
-        'spatialFreqSeq':0,
-        'noiseType':0,
-        'noiseSeedLabel':0,
-        'noiseSeed':0,
-        'noiseSeedSeq':0,
-        'noiseSizeLabel':0,
-        'noiseSize':0,
-        'noiseSizeSeq':0,
-        'noiseFreqLabel':0,
-        'noiseFreq':0,
-        'noiseFreqSeq':0,
-        'cloudSFLabel':0,
-        'cloudSF':0,
-        'cloudSFBand':0,
-        'cloudSpeedLabel':0,
-        'cloudSpeedX':0,
-        'cloudSpeedY':0,
-        'cloudSpeedBandLabel':0,
-        'cloudSpeedBand':0,
-        'cloudOrientLabel':0,
-        'cloudOrient':0,
-        'cloudOrientBand':0,
-        'batchStimMenu':1,
-        'batchStimList':1,
-        'batchStimAdd':1,
-        'batchStimRemove':1
-        }
+        checkerboard1DSettings = [
+            'length',
+            'lengthLabel',
+            'lengthSeq',
+            'width',
+            'widthLabel',
+            'widthSeq',
+            'orientation',
+            'orientationLabel',
+            'orientationSeq',
+            'pixelWidth',
+            'pixelWidthLabel',
+            'pixelWidthSeq',
+            'noiseType'
+        ]
 
-        driftMotionSettings = {
-        'angle':1,
-        'angleLabel':1,
-        'angleSeq':1,
-        'startRad':1,
-        'startRadLabel':1,
-        'startRadSeq':1,
-        'speed':1,
-        'speedLabel':1,
-        'speedSeq':1,
-        'driftFreqLabel':0,
-        'driftFreq':0,
-        'driftFreqSeq':0,
-        'turnDirection':0
-        }
+        cloudSettings = [
+            'objectAperture',
+            'objectApertureLabel',
+            'objectApertureSeq',
+            'cloudSFLabel',
+            'cloudSF',
+            'cloudSFBand',
+            'cloudSpeedLabel',
+            'cloudSpeedX',
+            'cloudSpeedY',
+            'cloudSpeedBandLabel',
+            'cloudSpeedBand',
+            'cloudOrientLabel',
+            'cloudOrient',
+            'cloudOrientBand'
+        ]
 
-        driftGratingMotionSettings = {
-        'angle':1,
-        'angleLabel':1,
-        'angleSeq':1,
-        'startRad':0,
-        'startRadLabel':0,
-        'startRadSeq':0,
-        'speed':0,
-        'speedLabel':0,
-        'speedSeq':0,
-        'driftFreq':1,
-        'driftFreqLabel':1,
-        'driftFreqSeq':1,
-        'turnDirection':0
-        }
+        windmillSettings = [
+            'gratingType',
+            'orientation',
+            'orientationLabel',
+            'orientationSeq',
+            'angularCyclesLabel',
+            'angularCycles',
+            'angularCyclesSeq'
+        ]
 
-        windmillMotionSettings = {
-        'angle':0,
-        'angleLabel':0,
-        'angleSeq':0,
-        'startRad':0,
-        'startRadLabel':0,
-        'startRadSeq':0,
-        'speed':0,
-        'speedLabel':0,
-        'speedSeq':0,
-        'driftFreqLabel':1,
-        'driftFreq':1,
-        'driftFreqSeq':1,
-        'turnDirection':1
-        }
+        imageSettings = [
+            'imagePath',
+            'orientation',
+            'orientationLabel',
+            'orientationSeq'
+        ]
 
-        staticMotionSettings = {
-        'angle':0,
-        'angleLabel':0,
-        'angleSeq':0,
-        'startRad':0,
-        'startRadLabel':0,
-        'startRadSeq':0,
-        'speed':0,
-        'speedLabel':0,
-        'speedSeq':0,
-        'driftFreqLabel':0,
-        'driftFreq':0,
-        'driftFreqSeq':0,
-        'turnDirection':0
-        }
+        frameSettings = [
+            'framePath'
+        ]
 
-        staticModSettings = {
-        'modulationFreq':0,
-        'modulationFreqLabel':0,
-        'modulationFreqSeq':0
-        }
+        batchSettings = [
+            'batchStimMenu',
+            'batchStimList',
+            'batchStimAdd',
+            'batchStimRemove'
+        ]
 
-        dynamicModSettings ={
-        'modulationFreq':1,
-        'modulationFreqLabel':1,
-        'modulationFreqSeq':1
-        }
+        randomDotSettings = [
+            'diameter', #dot size
+            'diameterLabel',
+            'diameterSeq',
+            'numDots', #number of dots
+            'numDotsLabel',
+            'numDotsSeq',
+            'dotCoherence', #coherence
+            'dotCoherenceLabel',
+            'dotCoherenceSeq',
+            'objectAperture',
+            'objectApertureLabel',
+            'objectApertureSeq'
+        ]
 
-        cartesianSettings ={
-        'xPos':1,
-        'xPosLabel':1,
-        'xPosSeq':1,
-        'yPos':1,
-        'yPosLabel':1,
-        'yPosSeq':1,
-        'polarRadius':0,
-        'polarRadiusLabel':0,
-        'polarRadiusSeq':0,
-        'polarAngle':0,
-        'polarAngleLabel':0,
-        'polarAngleSeq':0
-        }
+##########################################
+##########################################
+#Individual types of Motion have their own sets of controls
+        driftMotionSettings = [
+            'angle',
+            'angleLabel',
+            'angleSeq',
+            'startRad',
+            'startRadLabel',
+            'startRadSeq',
+            'speed',
+            'speedLabel',
+            'speedSeq'
+        ]
 
-        polarSettings ={
-        'xPos':0,
-        'xPosLabel':0,
-        'xPosSeq':0,
-        'yPos':0,
-        'yPosLabel':0,
-        'yPosSeq':0,
-        'polarRadius':1,
-        'polarRadiusLabel':1,
-        'polarRadiusSeq':1,
-        'polarAngle':1,
-        'polarAngleLabel':1,
-        'polarAngleSeq':1
-        }
+        driftGratingMotionSettings = [
+            'angle',
+            'angleLabel',
+            'angleSeq',
+            'driftFreq',
+            'driftFreqLabel',
+            'driftFreqSeq'
+        ]
 
-        cartesianMaskSettings ={
-        'maskXPos':1,
-        'maskXPosLabel':1,
-        'maskXPosSeq':1,
-        'maskYPos':1,
-        'maskYPosLabel':1,
-        'maskYPosSeq':1,
-        'maskPolarRadius':0,
-        'maskPolarRadiusLabel':0,
-        'maskPolarRadiusSeq':0,
-        'maskPolarAngle':0,
-        'maskPolarAngleLabel':0,
-        'maskPolarAngleSeq':0
-        }
+        randomDotMotionSettings = [
+            'speed',
+            'speedLabel',
+            'speedSeq',
+            'signalDirection', #signal dot direction
+            'signalDirectionLabel',
+            'signalDirectionSeq',
+            'noiseDirection', #noise dot direction
+            'noiseDirectionLabel',
+            'noiseDirectionSeq',
+        ]
 
-        polarMaskSettings ={
-        'maskXPos':0,
-        'maskXPosLabel':0,
-        'maskXPosSeq':0,
-        'maskYPos':0,
-        'maskYPosLabel':0,
-        'maskYPosSeq':0,
-        'maskPolarRadius':1,
-        'maskPolarRadiusLabel':1,
-        'maskPolarRadiusSeq':1,
-        'maskPolarAngle':1,
-        'maskPolarAngleLabel':1,
-        'maskPolarAngleSeq':1
-        }
+        windmillMotionSettings = [
+            'driftFreqLabel',
+            'driftFreq',
+            'driftFreqSeq',
+            'turnDirection'
+        ]
+
+        staticMotionSettings = []
+
+        randomWalkMotionSettings = [
+            'startRad',
+            'startRadLabel',
+            'startRadSeq',
+            'speed',
+            'speedLabel',
+            'speedSeq',
+            'walkFreq',
+            'walkFreqLabel',
+            'walkFreqSeq'
+        ]
+
+        randomWalkGratingMotionSettings = [
+            'angle',
+            'angleLabel',
+            'angleSeq',
+            'driftFreq',
+            'driftFreqLabel',
+            'driftFreqSeq',
+            'walkFreq',
+            'walkFreqLabel',
+            'walkFreqSeq'
+        ]
+
+        staticPositionalShiftSettings = []
+
+        randomPositionalShiftSettings = [
+            'TargetResolution',
+            'TargetResolutionLabel',
+            'TargetResolutionSeq'
+        ]
+##########################################
+##########################################
+#Individual types of temporal Modulation have their own sets of controls
+        staticModSettings = []
+
+        dynamicModSettings = [
+            'modulationFreq',
+            'modulationFreqLabel',
+            'modulationFreqSeq'
+        ]
+
+        noiseModSettings = [
+            'modulationFreq',
+            'modulationFreqLabel',
+            'modulationFreqSeq',
+            'noiseSeedLabel',
+            'noiseSeed',
+            'noiseSeedSeq'
+        ]
+
+##########################################
+##########################################
+#Individual types of coordinate systems have their own sets of controls
+
+        cartesianSettings = [
+            'xPos',
+            'xPosLabel',
+            'xPosSeq',
+            'yPos',
+            'yPosLabel',
+            'yPosSeq'
+        ]
+
+        polarSettings = [
+            'polarRadius',
+            'polarRadiusLabel',
+            'polarRadiusSeq',
+            'polarAngle',
+            'polarAngleLabel',
+            'polarAngleSeq'
+        ]
+
+        cartesianMaskSettings = [
+            'maskXPos',
+            'maskXPosLabel',
+            'maskXPosSeq',
+            'maskYPos',
+            'maskYPosLabel',
+            'maskYPosSeq'
+        ]
+
+        polarMaskSettings = [
+            'maskPolarRadius',
+            'maskPolarRadiusLabel',
+            'maskPolarRadiusSeq',
+            'maskPolarAngle',
+            'maskPolarAngleLabel',
+            'maskPolarAngleSeq'
+        ]
+
 
     #Design Panel
     def buildDesignPanel(self):
         left = 165 * scale_w
-        top = 300 * scale_h
+        top = 315 * scale_h
         width = 475 * scale_w
         height = 400 * scale_h
 
@@ -3506,10 +5416,10 @@ class App(QMainWindow):
 
 
         #insert blank after the object list box row
-        self.blank1.setFixedHeight(20 * scale_h)
-        self.designPanelLayout.addWidget(self.blank1,4,0,1,11)
-        self.designPanelLayout.setRowStretch(14,1)
-        self.blank1.setAlignment(QtCore.Qt.AlignVCenter)
+        # self.blank1.setFixedHeight(20 * scale_h)
+        # self.designPanelLayout.addWidget(self.blank1,4,0,1,11)
+        # self.designPanelLayout.setRowStretch(14,1)
+        # self.blank1.setAlignment(QtCore.Qt.AlignVCenter)
 
         #Object Type
         self.objectTypeLabel = QLabel('Objects',self)
@@ -3517,7 +5427,7 @@ class App(QMainWindow):
         self.objectTypeLabel.setFixedHeight(20 * scale_h)
 
         self.objectType = QComboBox(self)
-        self.objectType.addItems(['Circle','Rectangle','Grating','Noise','Cloud','Windmill','Annulus','Snake','Image','Batch'])
+        self.objectType.addItems(['Circle','Rectangle','Grating','Checkerboard','Checkerboard 1D','Random Dot','Cloud','Windmill','Annulus','Snake','Image','Frames','Batch'])
         self.objectType.activated.connect(lambda: self.menuProc('objectType',self.objectType.currentText()))
         self.objectType.setFixedHeight(20 * scale_h)
         self.objectType.setFixedWidth(100 * scale_w)
@@ -3626,8 +5536,15 @@ class App(QMainWindow):
         #Image Path
         self.imagePath =QComboBox(self)
         self.imagePath.setFixedHeight(20 * scale_h)
+        self.imagePath.setFixedWidth(100 * scale_w)
 
         self.designPanelLayout.addWidget(self.imagePath,7,0,1,2)
+
+        #Frame Path
+        self.framePath = QComboBox(self)
+        self.framePath.setFixedHeight(20 * scale_h)
+        self.framePath.setFixedWidth(100 * scale_w)
+        self.designPanelLayout.addWidget(self.framePath,7,0,1,2)
 
         #Batch stimulation. List all stimuli in drop down menu
 
@@ -3689,13 +5606,20 @@ class App(QMainWindow):
         self.gratingType = QComboBox(self)
         self.gratingType.addItems(['Square','Sine','Plaid'])
         self.designPanelLayout.addWidget(self.gratingType,7,0,1,2)
+        self.gratingType.setFixedWidth(100 * scale_w)
         self.gratingType.activated.connect(lambda: self.menuProc('gratingType',self.gratingType.currentText()))
 
-        #Noise Type
+        #Checkerboard Type
         self.noiseType = QComboBox(self)
         self.noiseType.addItems(['Binary','Normal','Uniform'])
         self.designPanelLayout.addWidget(self.noiseType,7,0,1,2)
         self.noiseType.activated.connect(lambda: self.menuProc('noiseType',self.noiseType.currentText()))
+
+        #insert blank after the spatial frequency row
+        self.blank4.setFixedHeight(20 * scale_h)
+        self.designPanelLayout.addWidget(self.blank4,11,0,1,10)
+        #self.blank4.setStyleSheet("QLabel {background-color: black;}")
+        self.blank4.setAlignment(QtCore.Qt.AlignVCenter)
 
         #Noise Seed
         self.noiseSeedLabel = QLabel('Seed',self)
@@ -3710,6 +5634,11 @@ class App(QMainWindow):
         self.noiseSeedSeq.setFixedWidth(20 * scale_w)
         self.noiseSeedSeq.activated.connect(lambda: self.menuProc('noiseSeedSeq',self.noiseSeedSeq.currentText()))
 
+        self.designPanelLayout.addWidget(self.noiseSeedLabel,11,4)
+        self.designPanelLayout.addWidget(self.noiseSeed,11,5)
+        self.designPanelLayout.addWidget(self.noiseSeedSeq,11,6)
+
+
         #Noise pixel size
         self.noiseSizeLabel = QLabel('Size',self)
         self.noiseSizeLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
@@ -3723,30 +5652,36 @@ class App(QMainWindow):
         self.noiseSizeSeq.setFixedWidth(20 * scale_w)
         self.noiseSizeSeq.activated.connect(lambda: self.menuProc('noiseSizeSeq',self.noiseSizeSeq.currentText()))
 
-        self.designPanelLayout.addWidget(self.noiseSeedLabel,8,0)
-        self.designPanelLayout.addWidget(self.noiseSeed,8,1)
-        self.designPanelLayout.addWidget(self.noiseSeedSeq,8,2)
 
-        self.designPanelLayout.addWidget(self.noiseSizeLabel,9,0)
-        self.designPanelLayout.addWidget(self.noiseSize,9,1)
-        self.designPanelLayout.addWidget(self.noiseSizeSeq,9,2)
+        self.designPanelLayout.addWidget(self.noiseSizeLabel,8,0)
+        self.designPanelLayout.addWidget(self.noiseSize,8,1)
+        self.designPanelLayout.addWidget(self.noiseSizeSeq,8,2)
 
-        #Noise frequency
-        self.noiseFreqLabel = QLabel('Freq.',self)
-        self.noiseFreqLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
-        self.noiseFreq = QLineEdit(self)
-        self.noiseFreq.setFixedWidth(40 * scale_w)
-        self.noiseFreq.setAlignment(QtCore.Qt.AlignRight)
-        self.noiseFreq.editingFinished.connect(lambda: self.variableProc('noiseFreq',self.noiseFreq.text()))
+        #Noise positional shifting
+        self.PositionalShiftType = QComboBox(self)
+        self.PositionalShiftType.addItems(['Static','Random'])
+        self.designPanelLayout.addWidget(self.PositionalShiftType,9,0,1,2)
+        self.PositionalShiftType.activated.connect(lambda: self.menuProc('PositionalShiftType',self.PositionalShiftType.currentText()))
+        self.PositionalShiftType.setFixedHeight(20 * scale_h)
+        self.PositionalShiftType.setFixedWidth(100 * scale_w)
 
-        self.noiseFreqSeq = QComboBox(self)
-        self.noiseFreqSeq.addItem('None')
-        self.noiseFreqSeq.setFixedWidth(20 * scale_w)
-        self.noiseFreqSeq.activated.connect(lambda: self.menuProc('noiseFreqSeq',self.noiseFreqSeq.currentText()))
+        #Target STA resolution for shifted white noise stimulus
+        self.TargetResolutionLabel = QLabel('Target Res.',self)
+        self.TargetResolutionLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.TargetResolution = QLineEdit(self)
+        self.TargetResolution.setFixedWidth(40 * scale_w)
+        self.TargetResolution.setAlignment(QtCore.Qt.AlignRight)
+        self.TargetResolution.editingFinished.connect(lambda: self.variableProc('TargetResolution',self.TargetResolution.text()))
 
-        self.designPanelLayout.addWidget(self.noiseFreqLabel,10,0)
-        self.designPanelLayout.addWidget(self.noiseFreq,10,1)
-        self.designPanelLayout.addWidget(self.noiseFreqSeq,10,2)
+        self.TargetResolutionSeq = QComboBox(self)
+        self.TargetResolutionSeq.addItem('None')
+        self.TargetResolutionSeq.setFixedWidth(20 * scale_w)
+        self.TargetResolutionSeq.activated.connect(lambda: self.menuProc('TargetResolutionSeq',self.TargetResolutionSeq.currentText()))
+
+        self.designPanelLayout.addWidget(self.TargetResolutionLabel,10,0)
+        self.designPanelLayout.addWidget(self.TargetResolution,10,1)
+        self.designPanelLayout.addWidget(self.TargetResolutionSeq,10,2)
+
 
         #Cloud parameters
 
@@ -3866,6 +5801,8 @@ class App(QMainWindow):
         self.designPanelLayout.addWidget(self.spatialFreq,8,1)
         self.designPanelLayout.addWidget(self.spatialFreqSeq,8,2)
 
+        
+
         #Orientation
         self.orientationLabel = QLabel('Orient.',self)
         self.orientationLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
@@ -3881,6 +5818,22 @@ class App(QMainWindow):
         self.designPanelLayout.addWidget(self.orientationLabel,9,0)
         self.designPanelLayout.addWidget(self.orientation,9,1)
         self.designPanelLayout.addWidget(self.orientationSeq,9,2)
+
+        #Pixel Width - 1D checkerboard
+        self.pixelWidthLabel = QLabel('Pix. Width',self)
+        self.pixelWidthLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.pixelWidth = QLineEdit(self)
+        self.pixelWidth.setAlignment(QtCore.Qt.AlignRight)
+        self.pixelWidth.setFixedWidth(40 * scale_w)
+        self.pixelWidthSeq = QComboBox(self)
+        self.pixelWidthSeq.addItem('None')
+        self.pixelWidthSeq.setFixedWidth(20 * scale_w)
+        self.pixelWidth.editingFinished.connect(lambda: self.variableProc('pixelWidth',self.pixelWidth.text()))
+        self.pixelWidthSeq.activated.connect(lambda: self.menuProc('pixelWidthSeq',self.pixelWidthSeq.currentText()))
+
+        self.designPanelLayout.addWidget(self.pixelWidthLabel,10,0)
+        self.designPanelLayout.addWidget(self.pixelWidth,10,1)
+        self.designPanelLayout.addWidget(self.pixelWidthSeq,10,2)
 
         #Spatial phase
         self.spatialPhaseLabel = QLabel('Phase',self)
@@ -3898,6 +5851,29 @@ class App(QMainWindow):
         self.designPanelLayout.addWidget(self.spatialPhase,9,1)
         self.designPanelLayout.addWidget(self.spatialPhaseSeq,9,2)
 
+
+        # #insert blank after the spatial frequency row
+        # self.blank4.setFixedHeight(20 * scale_h)
+        # self.designPanelLayout.addWidget(self.blank4,11,0,1,10)
+        # #self.blank4.setStyleSheet("QLabel {background-color: black;}")
+        # self.blank4.setAlignment(QtCore.Qt.AlignVCenter)
+
+        #aperture
+        self.objectApertureLabel = QLabel('Aperture',self)
+        self.objectApertureLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.objectAperture = QLineEdit(self)
+        self.objectAperture.setAlignment(QtCore.Qt.AlignRight)
+        self.objectAperture.setFixedWidth(40 * scale_w)
+        self.objectApertureSeq = QComboBox(self)
+        self.objectApertureSeq.addItem('None')
+        self.objectApertureSeq.setFixedWidth(20 * scale_w)
+        self.objectAperture.editingFinished.connect(lambda: self.variableProc('objectAperture',self.objectAperture.text()))
+        self.objectApertureSeq.activated.connect(lambda: self.menuProc('objectApertureSeq',self.objectApertureSeq.currentText()))
+
+        self.designPanelLayout.addWidget(self.objectApertureLabel,11,0)
+        self.designPanelLayout.addWidget(self.objectAperture,11,1)
+        self.designPanelLayout.addWidget(self.objectApertureSeq,11,2)
+        
         #angular cycles
         self.angularCyclesLabel = QLabel('Cycles',self)
         self.angularCycles = QLineEdit(self)
@@ -3914,6 +5890,75 @@ class App(QMainWindow):
         self.designPanelLayout.addWidget(self.angularCycles,8,1)
         self.designPanelLayout.addWidget(self.angularCyclesSeq,8,2)
 
+
+        ###########################
+        #Random Dot Kinetogram
+
+        #Number dots, random dot kinetogram
+        self.numDotsLabel = QLabel('# Dots',self)
+        self.numDotsLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.numDots = QLineEdit(self)
+        self.numDots.setFixedWidth(40 * scale_w)
+        self.numDots.setAlignment(QtCore.Qt.AlignRight)
+        self.numDotsSeq = QComboBox(self)
+        self.numDotsSeq.addItem('None')
+        self.numDotsSeq.setFixedWidth(20 * scale_w)
+        self.numDots.editingFinished.connect(lambda: self.variableProc('numDots',self.numDots.text()))
+        self.numDotsSeq.activated.connect(lambda: self.menuProc('numDotsSeq',self.numDotsSeq.currentText()))
+
+        self.designPanelLayout.addWidget(self.numDotsLabel,8,0)
+        self.designPanelLayout.addWidget(self.numDots,8,1)
+        self.designPanelLayout.addWidget(self.numDotsSeq,8,2)
+
+        #Dot coherence, random dot kinetogram
+        self.dotCoherenceLabel = QLabel('Coherence',self)
+        self.dotCoherenceLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.dotCoherence = QLineEdit(self)
+        self.dotCoherence.setFixedWidth(40 * scale_w)
+        self.dotCoherence.setAlignment(QtCore.Qt.AlignRight)
+        self.dotCoherenceSeq = QComboBox(self)
+        self.dotCoherenceSeq.addItem('None')
+        self.dotCoherenceSeq.setFixedWidth(20 * scale_w)
+        self.dotCoherence.editingFinished.connect(lambda: self.variableProc('dotCoherence',self.dotCoherence.text()))
+        self.dotCoherenceSeq.activated.connect(lambda: self.menuProc('dotCoherenceSeq',self.dotCoherenceSeq.currentText()))
+
+        self.designPanelLayout.addWidget(self.dotCoherenceLabel,9,0)
+        self.designPanelLayout.addWidget(self.dotCoherence,9,1)
+        self.designPanelLayout.addWidget(self.dotCoherenceSeq,9,2)
+
+        #Signal dot direction, random dot kinetogram
+        self.signalDirectionLabel = QLabel('Signal Dir.',self)
+        self.signalDirectionLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.signalDirection = QLineEdit(self)
+        self.signalDirection.setFixedWidth(40 * scale_w)
+        self.signalDirection.setAlignment(QtCore.Qt.AlignRight)
+        self.signalDirectionSeq = QComboBox(self)
+        self.signalDirectionSeq.addItem('None')
+        self.signalDirectionSeq.setFixedWidth(20 * scale_w)
+        self.signalDirection.editingFinished.connect(lambda: self.variableProc('signalDirection',self.signalDirection.text()))
+        self.signalDirectionSeq.activated.connect(lambda: self.menuProc('signalDirectionSeq',self.signalDirectionSeq.currentText()))
+
+        self.designPanelLayout.addWidget(self.signalDirectionLabel,8,8)
+        self.designPanelLayout.addWidget(self.signalDirection,8,9)
+        self.designPanelLayout.addWidget(self.signalDirectionSeq,8,10)
+
+        #Noise dot direction, random dot kinetogram
+        self.noiseDirectionLabel = QLabel('Noise Dir.',self)
+        self.noiseDirectionLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.noiseDirection = QLineEdit(self)
+        self.noiseDirection.setFixedWidth(40 * scale_w)
+        self.noiseDirection.setAlignment(QtCore.Qt.AlignRight)
+        self.noiseDirectionSeq = QComboBox(self)
+        self.noiseDirectionSeq.addItem('None')
+        self.noiseDirectionSeq.setFixedWidth(20 * scale_w)
+        self.noiseDirection.editingFinished.connect(lambda: self.variableProc('noiseDirection',self.noiseDirection.text()))
+        self.noiseDirectionSeq.activated.connect(lambda: self.menuProc('noiseDirectionSeq',self.noiseDirectionSeq.currentText()))
+
+        self.designPanelLayout.addWidget(self.noiseDirectionLabel,9,8)
+        self.designPanelLayout.addWidget(self.noiseDirection,9,9)
+        self.designPanelLayout.addWidget(self.noiseDirectionSeq,9,10)
+
+
         #Contrast
         self.contrastTypeLabel = QLabel('Contrast',self)
         self.contrastTypeLabel.setFont(bold)
@@ -3922,7 +5967,7 @@ class App(QMainWindow):
         self.contrastType.activated.connect(lambda: self.menuProc('contrastType',self.contrastType.currentText()))
         self.contrastType.setFixedHeight(20 * scale_h)
 
-        self.contrastLabel = QLabel('% Contrast',self)
+        self.contrastLabel = QLabel('Contrast',self)
         self.contrastLabel.setFixedHeight(20 * scale_h)
         self.contrastLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.contrast = QLineEdit(self)
@@ -3953,9 +5998,9 @@ class App(QMainWindow):
         self.modulationType = QComboBox(self)
         self.modulationType.activated.connect(lambda: self.menuProc('modulationType',self.modulationType.currentText()))
         self.modulationType.setFixedHeight(20 * scale_h)
-        self.modulationType.addItems(['Static','Square','Sine','Chirp'])
+        self.modulationType.addItems(['Static','Square','Sine','Chirp','Noise'])
 
-        self.modulationFreqLabel = QLabel('Frequency',self)
+        self.modulationFreqLabel = QLabel('Freq.',self)
         self.modulationFreq =  QLineEdit(self)
         self.modulationFreq.setFixedWidth(40 * scale_w)
         self.modulationFreq.setAlignment(QtCore.Qt.AlignRight)
@@ -3978,7 +6023,7 @@ class App(QMainWindow):
         self.motionTypeLabel.setFixedHeight(20 * scale_h)
         self.motionType = QComboBox(self)
         self.motionType.activated.connect(lambda: self.menuProc('motionType',self.motionType.currentText()))
-        self.motionType.addItems(['Static','Drift'])
+        self.motionType.addItems(['Static','Drift','Random Walk'])
         self.motionType.setFixedHeight(20 * scale_h)
 
         self.designPanelLayout.addWidget(self.motionTypeLabel,5,8)
@@ -4056,17 +6101,31 @@ class App(QMainWindow):
         self.designPanelLayout.addWidget(self.angle,9,9)
         self.designPanelLayout.addWidget(self.angleSeq,9,10)
 
+        #Update Frequency for random walk
+        self.walkFreqLabel = QLabel('Walk Freq.',self)
+        self.walkFreqLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.walkFreq = QLineEdit(self)
+        self.walkFreq.setFixedWidth(40 * scale_w)
+        self.walkFreq.setAlignment(QtCore.Qt.AlignRight)
+        self.walkFreqSeq = QComboBox(self)
+        self.walkFreqSeq.addItem('None')
+        self.walkFreqSeq.setFixedWidth(20 * scale_w)
+        self.walkFreq.editingFinished.connect(lambda: self.variableProc('walkFreq',self.walkFreq.text()))
+        self.walkFreqSeq.activated.connect(lambda: self.menuProc('walkFreqSeq',self.walkFreqSeq.currentText()))
+
+        self.designPanelLayout.addWidget(self.walkFreqLabel,9,8)
+        self.designPanelLayout.addWidget(self.walkFreq,9,9)
+        self.designPanelLayout.addWidget(self.walkFreqSeq,9,10)
+
+
+
         #blank after angle row so hiding modFrequency doesn't change grid
         self.blank5.setFixedHeight(20 * scale_h)
         self.designPanelLayout.addWidget(self.blank5,10,8,1,1)
         #self.blank5.setStyleSheet("QLabel {background-color: green;}")
         self.blank5.setAlignment(QtCore.Qt.AlignVCenter)
 
-        #insert blank after the spatial frequency row
-        self.blank4.setFixedHeight(20 * scale_h)
-        self.designPanelLayout.addWidget(self.blank4,11,0,1,10)
-        #self.blank4.setStyleSheet("QLabel {background-color: black;}")
-        self.blank4.setAlignment(QtCore.Qt.AlignVCenter)
+        
 
         #Delay
         self.timingLabel = QLabel('Timing',self)
@@ -4082,10 +6141,10 @@ class App(QMainWindow):
         self.delay.editingFinished.connect(lambda: self.variableProc('delay',self.delay.text()))
         self.delaySeq.activated.connect(lambda: self.menuProc('delaySeq',self.delaySeq.currentText()))
 
-        self.designPanelLayout.addWidget(self.timingLabel,12,0)
-        self.designPanelLayout.addWidget(self.delayLabel,13,0)
-        self.designPanelLayout.addWidget(self.delay,13,1)
-        self.designPanelLayout.addWidget(self.delaySeq,13,2)
+        self.designPanelLayout.addWidget(self.timingLabel,13,0)
+        self.designPanelLayout.addWidget(self.delayLabel,14,0)
+        self.designPanelLayout.addWidget(self.delay,14,1)
+        self.designPanelLayout.addWidget(self.delaySeq,14,2)
 
         #Duration
         self.durationLabel = QLabel('Duration',self)
@@ -4099,9 +6158,9 @@ class App(QMainWindow):
         self.duration.editingFinished.connect(lambda: self.variableProc('duration',self.duration.text()))
         self.durationSeq.activated.connect(lambda: self.menuProc('durationSeq',self.durationSeq.currentText()))
 
-        self.designPanelLayout.addWidget(self.durationLabel,14,0)
-        self.designPanelLayout.addWidget(self.duration,14,1)
-        self.designPanelLayout.addWidget(self.durationSeq,14,2)
+        self.designPanelLayout.addWidget(self.durationLabel,15,0)
+        self.designPanelLayout.addWidget(self.duration,15,1)
+        self.designPanelLayout.addWidget(self.durationSeq,15,2)
 
         #Trial Time
         self.trialTimeLabel = QLabel('Trial Time',self)
@@ -4111,9 +6170,15 @@ class App(QMainWindow):
         self.trialTimeLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         self.trialTime.editingFinished.connect(lambda: self.variableProc('trialTime',self.trialTime.text()))
 
-        self.designPanelLayout.addWidget(self.trialTimeLabel,15,0)
-        self.designPanelLayout.addWidget(self.trialTime,15,1)
+        self.designPanelLayout.addWidget(self.trialTimeLabel,16,0)
+        self.designPanelLayout.addWidget(self.trialTime,16,1)
 
+          #blank after angle row so hiding modFrequency doesn't change grid
+        # self.blank6.setFixedHeight(20 * scale_h)
+        # self.designPanelLayout.addWidget(self.blank6,16,8,1,1)
+        # #self.blank5.setStyleSheet("QLabel {background-color: green;}")
+        # self.blank6.setAlignment(QtCore.Qt.AlignVCenter)
+        
         #Repititions
         self.repititionLabel = QLabel('Repititions',self)
         self.repititionLabel.setFont(bold)
@@ -4128,11 +6193,11 @@ class App(QMainWindow):
         self.loopCheck = QCheckBox(self)
         self.loopCheck.setChecked(False)
 
-        self.designPanelLayout.addWidget(self.repititionLabel,12,4,1,2)
-        self.designPanelLayout.addWidget(self.repeatsLabel,13,4)
-        self.designPanelLayout.addWidget(self.repeats,13,5)
-        self.designPanelLayout.addWidget(self.loopCheckLabel,14,4)
-        self.designPanelLayout.addWidget(self.loopCheck,14,5)
+        self.designPanelLayout.addWidget(self.repititionLabel,13,4,1,2)
+        self.designPanelLayout.addWidget(self.repeatsLabel,14,4)
+        self.designPanelLayout.addWidget(self.repeats,14,5)
+        self.designPanelLayout.addWidget(self.loopCheckLabel,15,4)
+        self.designPanelLayout.addWidget(self.loopCheck,15,5)
 
         #Trajectories
         self.trajectoryLabel = QLabel('Trajectories')
@@ -4141,8 +6206,8 @@ class App(QMainWindow):
         self.trajectory.addItem('None')
         self.trajectory.activated.connect(lambda: self.menuProc('trajectory',self.trajectory.currentText()))
         self.trajectory.setFixedHeight(20 * scale_h)
-        self.designPanelLayout.addWidget(self.trajectoryLabel,12,8,1,2)
-        self.designPanelLayout.addWidget(self.trajectory,13,8,1,2)
+        self.designPanelLayout.addWidget(self.trajectoryLabel,13,8,1,2)
+        self.designPanelLayout.addWidget(self.trajectory,14,8,1,2)
 
         #Triggers
         self.triggerLabel = QLabel('Triggers')
@@ -4150,15 +6215,27 @@ class App(QMainWindow):
         self.trigger = QComboBox()
         self.trigger.addItems(['None','Wait For Trigger','Send Trigger'])
         self.trigger.setFixedHeight(20 * scale_h)
-        self.designPanelLayout.addWidget(self.triggerLabel,14,8,1,2)
-        self.designPanelLayout.addWidget(self.trigger,15,8,1,2)
+        self.sendTTL = QPushButton('TTL')
+        self.sendTTL.setFixedHeight(20 * scale_h)
+        self.sendTTL.setFixedWidth(30 * scale_w)
+        self.designPanelLayout.addWidget(self.triggerLabel,15,8,1,2)
+        self.designPanelLayout.addWidget(self.trigger,16,8,1,2)
+        self.designPanelLayout.addWidget(self.sendTTL,16,7,1,1)
+        self.sendTTL.clicked.connect(lambda: self.buttonProc("sendTTL"))
+
+        self.startEphys = QPushButton('E',self)
+        self.startEphys.setFixedHeight(20 * scale_h)
+        self.startEphys.setFixedWidth(20 * scale_w)
+        self.designPanelLayout.addWidget(self.startEphys,16,10)
+        self.startEphys.clicked.connect(lambda: self.buttonProc("startEphys"))
+
 
     #Masks Panel
     def buildMasksPanel(self):
         left = 165 * scale_w
-        top = 300 * scale_h
+        top = 315 * scale_h
         width = 475 * scale_w
-        height = 190 * scale_h
+        height = 205 * scale_h
 
         if system == 'Windows' or system == 'Linux':
             #fonts
@@ -4351,7 +6428,7 @@ class App(QMainWindow):
     #Sequences Panel
     def buildSequencePanel(self):
         left = 165 * scale_w
-        top = 300 * scale_h
+        top = 315 * scale_h
         width = 475 * scale_w
         height = 400 * scale_h
 
@@ -4385,14 +6462,14 @@ class App(QMainWindow):
 
         #Sequence list box
         self.seqListBox = QListWidget()
-        seqPanelLayout.addWidget(self.seqListBox,0,2,4,2)
+        seqPanelLayout.addWidget(self.seqListBox,0,2,4,4)
         self.seqListBox.itemClicked.connect(lambda: self.listProc('seqListBox',self.seqListBox.currentRow()))
 
         #Sequence entry
         self.seqEntry = QLineEdit()
-        seqPanelLayout.addWidget(self.seqEntry,4,0,1,4)
+        seqPanelLayout.addWidget(self.seqEntry,4,0,1,6)
         self.seqEntry.editingFinished.connect(lambda: self.variableProc('seqEntry',self.seqEntry.text()))
-
+        
         #Spacer
         self.blank1 = QLabel('')
         seqPanelLayout.addWidget(self.blank1,5,0)
@@ -4401,7 +6478,7 @@ class App(QMainWindow):
         self.trajListBoxLabel = QLabel('Trajectories')
         self.trajListBoxLabel.setFont(bold)
         self.trajListBoxLabel.setAlignment(QtCore.Qt.AlignCenter)
-        seqPanelLayout.addWidget(self.trajListBoxLabel,6,2,1,2)
+        seqPanelLayout.addWidget(self.trajListBoxLabel,6,2,1,4)
 
         #Add trajectory button
         self.addTraj = QPushButton('Add\nTrajectory')
@@ -4416,7 +6493,7 @@ class App(QMainWindow):
         #Trajectory list box
         self.trajListBox = QListWidget()
         self.trajListBox.itemClicked.connect(lambda: self.listProc('trajListBox',self.trajListBox.currentRow()))
-        seqPanelLayout.addWidget(self.trajListBox,7,2,4,2)
+        seqPanelLayout.addWidget(self.trajListBox,7,2,4,4)
 
         #Angle list box label
         self.angleListBoxLabel = QLabel('Angle')
@@ -4440,51 +6517,98 @@ class App(QMainWindow):
         self.durationListBox.currentRowChanged.connect(lambda: self.listProc('durationListBox',self.durationListBox.currentRow()))
         seqPanelLayout.addWidget(self.durationListBox,12,2,4,2)
 
+        #Speed list box label
+        self.speedListBoxLabel = QLabel('Speed')
+        self.speedListBoxLabel.setFont(bold)
+        self.speedListBoxLabel.setAlignment(QtCore.Qt.AlignCenter)
+        seqPanelLayout.addWidget(self.speedListBoxLabel,11,4,1,2)
+
+        #Speed list box
+        self.speedListBox = QListWidget()
+        self.speedListBox.currentRowChanged.connect(lambda: self.listProc('speedListBox',self.speedListBox.currentRow()))
+        seqPanelLayout.addWidget(self.speedListBox,12,4,4,2)
+
+        #Link aperture list box label
+        self.linkApertureListBoxLabel = QLabel('Link')
+        self.linkApertureListBoxLabel.setFont(bold)
+        self.linkApertureListBoxLabel.setAlignment(QtCore.Qt.AlignCenter)
+        seqPanelLayout.addWidget(self.linkApertureListBoxLabel,11,6,1,1)
+
+        #link aperture list box
+        self.linkApertureListBox = QListWidget()
+        self.linkApertureListBox.currentRowChanged.connect(lambda: self.listProc('linkApertureListBox',self.linkApertureListBox.currentRow()))
+        seqPanelLayout.addWidget(self.linkApertureListBox,12,6,4,1)
+
         #Spacer
-        self.blank2 = QLabel('            ')
-        seqPanelLayout.addWidget(self.blank2,11,4)
+        # self.blank2 = QLabel('')
+        # seqPanelLayout.addWidget(self.blank2,11,7,4,1)
 
         #Trajectory Angle Label
         self.trajAngleLabel = QLabel('Angle')
         self.trajAngleLabel.setFont(bold)
         self.trajAngleLabel.setAlignment(QtCore.Qt.AlignCenter)
-        seqPanelLayout.addWidget(self.trajAngleLabel,11,5)
+        seqPanelLayout.addWidget(self.trajAngleLabel,11,8,1,2)
 
         #Trajectory Duration Label
         self.trajDurationLabel = QLabel('Duration')
         self.trajDurationLabel.setFont(bold)
         self.trajDurationLabel.setAlignment(QtCore.Qt.AlignCenter)
-        seqPanelLayout.addWidget(self.trajDurationLabel,11,6)
+        seqPanelLayout.addWidget(self.trajDurationLabel,11,10,1,2)
+
+        #Trajectory Speed Label
+        self.trajSpeedLabel = QLabel('Speed')
+        self.trajSpeedLabel.setFont(bold)
+        self.trajSpeedLabel.setAlignment(QtCore.Qt.AlignCenter)
+        seqPanelLayout.addWidget(self.trajSpeedLabel,11,12,1,2)
+
+        #Link Aperture Label
+        self.trajSpeedLabel = QLabel('Link')
+        self.trajSpeedLabel.setFont(bold)
+        self.trajSpeedLabel.setAlignment(QtCore.Qt.AlignCenter)
+        seqPanelLayout.addWidget(self.trajSpeedLabel,11,14,1,1)
 
         #Trajectory Angle Entry
         self.trajAngle = QLineEdit()
-        seqPanelLayout.addWidget(self.trajAngle,12,5)
+        seqPanelLayout.addWidget(self.trajAngle,12,8,1,2)
 
         #Trajectory Duration Entry
         self.trajDuration = QLineEdit()
-        seqPanelLayout.addWidget(self.trajDuration,12,6)
+        seqPanelLayout.addWidget(self.trajDuration,12,10,1,2)
+
+        #Trajectory Speed Entry
+        self.trajSpeed = QLineEdit()
+        seqPanelLayout.addWidget(self.trajSpeed,12,12,1,2)
+
+        #Link aperture Entry
+        self.trajLink = QLineEdit()
+        seqPanelLayout.addWidget(self.trajLink,12,14,1,1)
 
         #Append Segment Button
-        self.appendSegment = QPushButton('Append Segment')
-        seqPanelLayout.addWidget(self.appendSegment,13,5,1,2)
+        self.appendSegment = QPushButton('Append')
+        seqPanelLayout.addWidget(self.appendSegment,13,8,1,3)
         self.appendSegment.clicked.connect(lambda: self.buttonProc("appendSegment"))
+
+        #Append Hold Segment Button
+        self.appendHold = QPushButton('Hold')
+        seqPanelLayout.addWidget(self.appendHold,13,11,1,3)
+        self.appendHold.clicked.connect(lambda: self.buttonProc("appendHold"))
 
         #Edit Segment Button
         self.editSegment = QPushButton('Edit Segment')
-        seqPanelLayout.addWidget(self.editSegment,14,5,1,2)
+        seqPanelLayout.addWidget(self.editSegment,14,8,1,6)
         self.editSegment.clicked.connect(lambda: self.buttonProc("editSegment"))
 
         #Remove Segment Button
         self.removeSegment = QPushButton('Remove Segment')
-        seqPanelLayout.addWidget(self.removeSegment,15,5,1,2)
+        seqPanelLayout.addWidget(self.removeSegment,15,8,1,6)
         self.removeSegment.clicked.connect(lambda: self.buttonProc("removeSegment"))
 
     #Path Panel
     def buildPathPanel(self):
         left = 10 * scale_w
-        top = 135 * scale_h
+        top = 145 * scale_h
         width = 475 * scale_w
-        height = 125 * scale_h
+        height = 115 * scale_h
 
         self.pathGroup = QGroupBox(self)
         pathLayout = QGridLayout()
@@ -4536,6 +6660,8 @@ class App(QMainWindow):
 
     #Globals Panel
     def buildGlobalsPanel(self):
+        global BitDepth
+
         left = 495 * scale_w
         top = 10 * scale_h
         width = 145 * scale_w
@@ -4554,10 +6680,12 @@ class App(QMainWindow):
 
         self.globalsLayout =QGridLayout()
         self.globalsGroup.setLayout(self.globalsLayout)
+        self.globalsLayout.setContentsMargins(5,0,0,5)
 
         #Globals label
         self.globalsLabel = QLabel('Globals')
         self.globalsLayout.addWidget(self.globalsLabel,0,0,1,2)
+        
         self.globalsLabel.setFont(bold)
 
         #Monitor
@@ -4572,27 +6700,30 @@ class App(QMainWindow):
         for i in range(0,numScreens):
             self.monitor.addItem(str(i))
 
-        self.globalsLayout.addWidget(self.monitorLabel,1,0,1,2)
+        self.globalsLayout.addWidget(self.monitorLabel,1,0,1,3)
         self.monitorLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
-        self.globalsLayout.addWidget(self.monitor,1,2)
+        self.globalsLayout.addWidget(self.monitor,1,3,1,2)
+        self.monitor.activated.connect(lambda: self.menuProc('monitor',self.monitor.currentText()))
+
 
         #PPM
         self.ppmLabel = QLabel('PPM')
         self.ppm = QLineEdit()
         self.ppm.setFixedWidth(45)
         self.ppm.setAlignment(QtCore.Qt.AlignRight)
-        self.globalsLayout.addWidget(self.ppmLabel,2,0,1,2)
+        self.globalsLayout.addWidget(self.ppmLabel,2,0,1,3)
         self.ppmLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
-        self.globalsLayout.addWidget(self.ppm,2,2)
+        self.globalsLayout.addWidget(self.ppm,2,3,1,2)
+        self.ppm.editingFinished.connect(lambda: self.variableProc('ppm',self.ppm.text()))
 
         #Background
         self.backgroundLabel = QLabel('Background')
         self.background = QLineEdit()
         self.background.setFixedWidth(45)
         self.background.setAlignment(QtCore.Qt.AlignRight)
-        self.globalsLayout.addWidget(self.backgroundLabel,3,0,1,2)
+        self.globalsLayout.addWidget(self.backgroundLabel,3,0,1,3)
         self.backgroundLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
-        self.globalsLayout.addWidget(self.background,3,2)
+        self.globalsLayout.addWidget(self.background,3,3,1,2)
         self.background.editingFinished.connect(lambda: self.variableProc('background',self.background.text()))
 
 
@@ -4601,9 +6732,9 @@ class App(QMainWindow):
         self.xOffset = QLineEdit()
         self.xOffset.setFixedWidth(45)
         self.xOffset.setAlignment(QtCore.Qt.AlignRight)
-        self.globalsLayout.addWidget(self.xOffsetLabel,4,0,1,2)
+        self.globalsLayout.addWidget(self.xOffsetLabel,4,0,1,3)
         self.xOffsetLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
-        self.globalsLayout.addWidget(self.xOffset,4,2)
+        self.globalsLayout.addWidget(self.xOffset,4,3,1,2)
         self.xOffset.editingFinished.connect(lambda: self.variableProc('xOffset',self.xOffset.text()))
 
         #Y Offset
@@ -4611,9 +6742,9 @@ class App(QMainWindow):
         self.yOffset = QLineEdit()
         self.yOffset.setFixedWidth(45)
         self.yOffset.setAlignment(QtCore.Qt.AlignRight)
-        self.globalsLayout.addWidget(self.yOffsetLabel,5,0,1,2)
+        self.globalsLayout.addWidget(self.yOffsetLabel,5,0,1,3)
         self.yOffsetLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
-        self.globalsLayout.addWidget(self.yOffset,5,2)
+        self.globalsLayout.addWidget(self.yOffset,5,3,1,2)
         self.yOffset.editingFinished.connect(lambda: self.variableProc('yOffset',self.yOffset.text()))
 
         #Sync Frames
@@ -4621,9 +6752,9 @@ class App(QMainWindow):
         self.syncFrames = QLineEdit()
         self.syncFrames.setFixedWidth(45)
         self.syncFrames.setAlignment(QtCore.Qt.AlignRight)
-        self.globalsLayout.addWidget(self.syncFramesLabel,6,0,1,2)
+        self.globalsLayout.addWidget(self.syncFramesLabel,6,0,1,3)
         self.syncFramesLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
-        self.globalsLayout.addWidget(self.syncFrames,6,2)
+        self.globalsLayout.addWidget(self.syncFrames,6,3,1,2)
         self.syncFrames.editingFinished.connect(lambda: self.variableProc('syncFrames',self.syncFrames.text()))
 
         #Sync Spot
@@ -4632,26 +6763,40 @@ class App(QMainWindow):
         self.syncSpot = QCheckBox(self)
         self.syncSpot.setChecked(True)
         self.syncSpot.stateChanged.connect(lambda: self.checkProc('syncSpot',self.syncSpot.isChecked()))
-        self.globalsLayout.addWidget(self.syncSpotLabel,7,0,1,2)
-        self.globalsLayout.addWidget(self.syncSpot,7,2)
+        self.globalsLayout.addWidget(self.syncSpotLabel,7,0,1,3)
+        self.globalsLayout.addWidget(self.syncSpot,7,3,1,2)
 
         #Gamma Table
         self.gammaTableLabel = QLabel('Gamma')
         self.gammaTable = QComboBox()
-        self.gammaTable.addItems(['1.0','2.2'])
-        self.gammaTable.setFixedWidth(45)
+        self.gammaTable.addItems(['Native','Custom'])
+        self.gammaTable.setFixedWidth(65)
         self.gammaTable.activated.connect(lambda: self.menuProc('gammaTable',self.gammaTable.currentText()))
 
-        self.globalsLayout.addWidget(self.gammaTableLabel,8,0,1,2)
+        self.globalsLayout.addWidget(self.gammaTableLabel,8,0,1,1)
         self.gammaTableLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
-        self.globalsLayout.addWidget(self.gammaTable,8,2)
+        self.globalsLayout.addWidget(self.gammaTable,8,2,1,4)
+
+        #Intensity encoding
+        self.encodingLabel = QLabel('Bit Depth')
+        self.encoding = QComboBox()
+        self.encoding.addItems(['8','12'])
+        self.encoding.setFixedWidth(65)
+        self.encoding.activated.connect(lambda: self.menuProc('encoding',self.encoding.currentText()))
+
+        self.globalsLayout.addWidget(self.encodingLabel,9,0,1,1)
+        self.encodingLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.globalsLayout.addWidget(self.encoding,9,2,1,4)
+
+        self.encoding.setCurrentText('12')
+        BitDepth = 12
 
     #Stimulus Bank
     def buildStimusBank(self):
         left = 10 * scale_w
-        top = 318 * scale_h
+        top = 348 * scale_h
         width = 145 * scale_w
-        height = 350 * scale_h
+        height = 330 * scale_h
 
         if system == 'Windows' or system == 'Linux':
             #fonts
@@ -4664,15 +6809,33 @@ class App(QMainWindow):
 
         #Stimulus Bank Label
         self.stimBankLabel  = QLabel('Stimulus Bank',self)
-        self.stimBankLabel.move(left+30 * scale_w,top-55 * scale_h)
+        self.stimBankLabel.move(left+30 * scale_w,top-95 * scale_h)
 
         #Stimulus subfolder
         self.subFolder = QComboBox(self)
-        self.subFolder.move(left,top-30 * scale_h)
+        self.subFolder.move(left,top-60 * scale_h)
         self.subFolder.resize(width,25 * scale_h)
-        self.subFolder.addItems(['Ben','Geoff'])
+
+        #find the available user profiles
+        profileList = [profile for profile in os.listdir(stimPath) if os.path.isdir(os.path.join(stimPath,profile))]
+
+        self.subFolder.addItems(profileList)
         self.subFolder.setFont(large)
         self.subFolder.activated.connect(lambda: self.menuProc('subFolder',self.subFolder.currentText()))
+
+        #Stimulus subsubfolder
+        self.subsubFolder = QComboBox(self)
+        self.subsubFolder.move(left,top-30 * scale_h)
+        self.subsubFolder.resize(width,25 * scale_h)
+
+        #find the currently selected user profile
+        subfolderPath = os.path.join(stimPath,self.subFolder.currentText())
+        #get the subsubfolders within that profile
+        subfolderList = [subfolder for subfolder in os.listdir(subfolderPath) if os.path.isdir(os.path.join(subfolderPath,subfolder))]
+
+        self.subsubFolder.addItems(subfolderList)
+        self.subsubFolder.setFont(large)
+        self.subsubFolder.activated.connect(lambda: self.menuProc('subsubFolder',self.subsubFolder.currentText()))
 
         #Stimulus Bank
         self.stimBank = QListWidget(self)
@@ -4683,13 +6846,13 @@ class App(QMainWindow):
 
         #save stimulus
         self.saveStim = QPushButton('Save',self)
-        self.saveStim.move(left+5 * scale_w,top + 360 * scale_h)
+        self.saveStim.move(left+5 * scale_w,top + 340 * scale_h)
         self.saveStim.resize(60 * scale_w,20 * scale_h)
         self.saveStim.clicked.connect(lambda: self.buttonProc("saveStim"))
 
         #delete stimulus
         self.deleteStim = QPushButton('Delete',self)
-        self.deleteStim.move(left+80 * scale_w,top + 360 * scale_h)
+        self.deleteStim.move(left+80 * scale_w,top + 340 * scale_h)
         self.deleteStim.resize(60 * scale_w,20 * scale_h)
         self.deleteStim.clicked.connect(lambda: self.buttonProc("deleteStim"))
 
@@ -4710,19 +6873,26 @@ class App(QMainWindow):
 
 
         #show input dialog for naming the sequence
-        #stimulus = self.stimBank.currentItem()
-        #stimName = stimulus.text() #current selection is default name
+        savedStimulus = self.stimBank.currentItem()
+        if savedStimulus is None:
+            stimName = ''
+        else:
+            stimName = savedStimulus.text() #current selection is default name
 
-        name, ok = QInputDialog.getText(self, 'Save Stimulus','Stimulus Name:')#,QLineEdit.Normal,stimName)
-
+        name, ok = QInputDialog.getText(self, 'Save Stimulus','Stimulus Name:',echo=QLineEdit.Normal,text=stimName)
+        
         if name == '':
             return
 
         fileName = name + '.stim'
 
         subfolder = self.subFolder.currentText()
+        subsubfolder = self.subsubFolder.currentText()
 
-        path = stimPath + subfolder + '/' + fileName
+        if len(subsubfolder) > 0:
+            path = stimPath + subfolder + '/' + subsubfolder + '/' + fileName
+        else:  
+            path = stimPath + subfolder + '/' + fileName
 
         print('Saved Stimulus: ' + path)
 
@@ -4742,23 +6912,57 @@ class App(QMainWindow):
         file.close()
 
         #refresh stimulus bank
-        self.getStimulusBank()
+        self.changeUserSubFolder(subsubfolder)
+
+        # self.getStimulusBank()
 
         #set the list box to select the newly saved stimulus
         newItem = self.stimBank.findItems(name,QtCore.Qt.MatchExactly)
         self.stimBank.setCurrentItem(newItem[0])
 
-    #saves MotionCloud array as an HDF5
-    def saveCloud(self,cloud):
+        self.loadStimulus()
 
-        #put the file in the stimulus subfolder
-        fileName = 'cloudFile.hdf5'
-        subfolder = self.subFolder.currentText()
-        path = stimPath + subfolder + '/' + fileName
+    #save the designed stimulus to bitmap movie on disk
+    def saveFramesToDisk(self):
+        global abortStatus
 
-        file = h5py.File(path,'w')
-        file.create_dataset('MC',data=cloud,compression='gzip',compression_opts=9)
-        file.close()
+        if isOpen == 0:
+            self.initializeSession()
+
+        #Reset abort abortStatus
+        abortStatus = 0
+        self.runStim(1)
+
+    #Returns all of the trigger settings into a tuple
+    def getTriggerSettings(self):
+        interface = globalSettings['triggerInterface']
+        digitalOut = globalSettings['digitalOut']
+        digitalIn = globalSettings['digitalIn']
+        portAddress = globalSettings['parallelPortAddress']
+
+        return (interface,digitalOut,digitalIn,portAddress)
+
+    #Sends a TTL pulse through pin 2 of the parallel port
+    def sendTTLPulse(self,interface,digitalOut,digitalIn,portAddress):
+                
+        if interface == 'Parallel Port':
+            port = parallel.ParallelPort(address = portAddress)
+            
+            if port:
+                port.setPin(int(digitalOut),0) #set low
+                port.setPin(int(digitalOut),1) #set high
+                port.setPin(int(digitalOut),0) #set low
+
+        elif interface == 'Nidaq Board':
+            if digitalOut:
+                with ni.Task() as task:
+                    task.do_channels.add_do_chan(digitalOut)
+                    task.write(False)
+                    task.write(True)
+                    task.write(False)
+
+        #time stamp the trigger
+        return time()
 
     #deletes stimulus file from disk
     def deleteStimulus(self):
@@ -4766,6 +6970,7 @@ class App(QMainWindow):
         #prevent deletion of last stimulus
         if(self.stimBank.count() == 1):
             return
+
 
         #which stimulus is selected
         stimulus = self.stimBank.currentItem()
@@ -4775,7 +6980,12 @@ class App(QMainWindow):
 
         fileName = stimName + '.stim'
         subfolder = self.subFolder.currentText()
-        path = stimPath + subfolder + '/' + fileName
+        subsubfolder = self.subsubFolder.currentText()
+
+        if len(subsubfolder) > 0:
+            path = stimPath + subfolder + '/' + subsubfolder + '/' + fileName
+        else:
+            path = stimPath + subfolder + '/' + fileName
 
         #delete the file, remove it from the stimulus bank
         os.remove(path)
@@ -4864,7 +7074,12 @@ class App(QMainWindow):
 
         fileName = stimName + '.stim'
         subfolder = self.subFolder.currentText()
-        path = stimPath + subfolder + '/' + fileName
+        subsubfolder = self.subsubFolder.currentText()
+
+        if len(subsubfolder) > 0:
+            path = stimPath + subfolder + "/" + subsubfolder + "/" + fileName
+        else:
+            path = stimPath + subfolder + '/' + fileName
 
         #open and read stimulus file to dictionaries
         with open(path,'r') as file:
@@ -4900,24 +7115,36 @@ class App(QMainWindow):
             numObjects = len(stimLoaded) #total number of loaded objects
 
             for i in range(numObjects):
+                #Check for Noise objects, rename them to Checkerboards for backwards compatibility
+                if stimLoaded[i]['objectType'] == 'Noise':
+                    stimLoaded[i]['objectType'] = 'Checkerboard'
+
                 objectList.append((stimLoaded[i]['objectType'])) #fill out the object list so addStimDict will work correctly
                 self.addStimDict()
 
             #assign the loaded stim/seqAssign dict into the actual stim/seqAssign dict
             #this allows for the loaded stim to have an incomplete stim dictionary, if new controls have been added
 
+            #exclude the globals from the stimulus load, back compatability purposes
+            globalKeyList = list(globalSettings.keys())
+
             for object,_ in stimLoaded.items():
                 for key,value in stimLoaded[object].items():
-                    stim[object][key] = value
+                    if key in globalKeyList:
+                        continue
+                    else:
+                        stim[object][key] = value
 
             for object,_ in seqAssignLoaded.items():
                 for key,value in seqAssignLoaded[object].items():
-                    try:
-                        seqAssign[object][key]['control'] = seqAssignLoaded[object][key]['control']
-                        seqAssign[object][key]['parent'] = seqAssignLoaded[object][key]['parent']
-                        seqAssign[object][key]['sequence'] = seqAssignLoaded[object][key]['sequence']
-                    except:
-                        print('Error loading stimulus. Sequence assignment.')
+                    
+                    if key in seqAssign[object]: 
+                        try:
+                            seqAssign[object][key]['control'] = seqAssignLoaded[object][key]['control']
+                            seqAssign[object][key]['parent'] = seqAssignLoaded[object][key]['parent']
+                            seqAssign[object][key]['sequence'] = seqAssignLoaded[object][key]['sequence']
+                        except:
+                            print('Error loading stimulus. Sequence assignment.')
 
             #convert string controls to object controls
             for object,_ in seqAssign.items():
@@ -4959,8 +7186,12 @@ class App(QMainWindow):
             else:
                 self.angleListBox.clear()
                 self.durationListBox.clear()
+                self.speedListBox.clear()
+                self.linkApertureListBox.clear()
                 self.trajAngle.setText('')
                 self.trajDuration.setText('')
+                self.trajSpeed.setText('')
+                self.trajLink.setText('')
 
             self.trajectory.clear()
             self.trajectory.addItems(trajList)
@@ -4989,8 +7220,32 @@ class App(QMainWindow):
         subfolder = self.subFolder.currentText()
         path = stimPath + subfolder
 
+        if os.path.isdir(path) == False:
+            return        
+
         fileList = os.listdir(path)
+        subfolderList = []
         stimList = []
+
+        #remove all subsubfolder references in the menu
+        self.subsubFolder.clear()
+
+        #find all the subfolders
+        i = 0
+        for _ in fileList:
+            folderCheck = os.path.join(path,fileList[i])
+            if os.path.isdir(folderCheck):
+                subfolderList.append(fileList[i])
+            i += 1
+
+        #add subfolder if it is there
+        if len(subfolderList) > 0:
+            path = stimPath + subfolder + "/" + subfolderList[0]
+
+        self.subsubFolder.addItems(subfolderList)
+
+        #get the files within the first subfolder
+        fileList = os.listdir(path)
 
         i = 0
         for _ in fileList:
@@ -4999,15 +7254,19 @@ class App(QMainWindow):
             #only accept .stim files (these are just text files with .stim extension)
             if ext == '.stim':
                 stimList.append(fileList[i])
-
+           
             i += 1
+
+        
 
         #add stimulus files to the stimulus bank
         self.stimBank.clear()
-        self.stimBank.addItems(stimList)
 
-        #alphabetical order
-        self.stimBank.sortItems(QtCore.Qt.AscendingOrder)
+        if len(stimList) > 0:
+            self.stimBank.addItems(stimList)
+
+            #alphabetical order
+            self.stimBank.sortItems(QtCore.Qt.AscendingOrder)
 
         return stimList
 
@@ -5015,6 +7274,9 @@ class App(QMainWindow):
     def getImageBank(self):
         subfolder = self.subFolder.currentText()
         path = stimPath + subfolder
+
+        if os.path.isdir(path) == False:
+            return
 
         fileList = os.listdir(path)
         imageList = []
@@ -5031,6 +7293,19 @@ class App(QMainWindow):
 
         #add the images to the drop down menu
         self.imagePath.addItems(imageList)
+
+    #finds all the frame sequences in the selected stimulus subfolder with .bmp extensions
+    def getFrameBank(self):
+        subfolder = self.subFolder.currentText()
+        path = stimPath + subfolder + "/Frames/"
+
+        if os.path.isdir(path) == False:
+            return
+
+        folderList = os.listdir(path)
+
+        #add the images to the drop down menu
+        self.framePath.addItems(folderList)
 
     #is the string a decimal number?
     def isFloat(self,s):
@@ -5061,10 +7336,10 @@ class App(QMainWindow):
     #Default settings
     def setDefaults(self):
         self.monitor.setCurrentIndex(0)
-        self.ppm.setText('0.717')
+        self.ppm.setText('0.34')
         self.background.setText('0')
-        self.xOffset.setText('0')
-        self.yOffset.setText('0')
+        self.xOffset.setText('-105')
+        self.yOffset.setText('-25')
         self.syncFrames.setText('0')
         self.xPos.setText('0')
         self.yPos.setText('0')
@@ -5096,7 +7371,7 @@ class App(QMainWindow):
         self.maskPolarAngle.setText('0')
         self.noiseSize.setText('50')
         self.noiseSeed.setText('0')
-        self.noiseFreq.setText('0')
+        # self.noiseFreq.setText('0')
         self.cloudSF.setText('0.125')
         self.cloudSFBand.setText('0.1')
         self.cloudSpeedX.setText('1.0')
@@ -5109,9 +7384,351 @@ class App(QMainWindow):
         self.stimID.setText('0')
         self.saveToPath.setText(saveToPath)
 
+     #saves MotionCloud array as an HDF5
+   # def saveCloud(self,cloud):
+
+        #put the file in the stimulus subfolder
+        # fileName = 'cloudFile.hdf5'
+        # subfolder = self.subFolder.currentText()
+        # path = stimPath + subfolder + '/' + fileName
+
+        # file = h5py.File(path,'w')
+        # file.create_dataset('MC',data=cloud,compression='gzip',compression_opts=9)
+        # file.close()
+
+#Build the trigger menu GUI
+class triggerMenu(QMainWindow):
+    #initializes the trigger menu class
+    def __init__(self):
+        super(triggerMenu,self).__init__()
+
+        global globalSettings, NI_FLAG
+
+        #GUI dimensions
+        self.title = 'Setup Triggers'
+        self.left = 30
+        self.top = 30
+        self.width = 250
+        self.height = 200
+
+        #set default fonts/sizes depending on operating system
+        if system == 'Windows' or system == 'Linux':
+            #fonts
+            bold = QtGui.QFont("Roboto", 10,weight=QtGui.QFont.Normal)
+            boldLarge = QtGui.QFont("Roboto", 12,weight=QtGui.QFont.Normal)
+            titleFont = QtGui.QFont("Roboto Light",28,weight=QtGui.QFont.Light)
+            subTitleFont = QtGui.QFont("Roboto Light",10,weight=QtGui.QFont.Light)
+            counterFont = QtGui.QFont('Roboto Light',18,weight=QtGui.QFont.Normal)
+
+        elif system == 'Darwin':
+            #fonts
+            bold = QtGui.QFont("Helvetica", 12,weight=QtGui.QFont.Normal)
+            boldLarge = QtGui.QFont("Helvetica", 14,weight=QtGui.QFont.Normal)
+            titleFont = QtGui.QFont("Helvetica",32,weight=QtGui.QFont.Light)
+            subTitleFont = QtGui.QFont("Helvetica",12,weight=QtGui.QFont.ExtraLight)
+            counterFont = QtGui.QFont('Helvetica',18,weight=QtGui.QFont.Normal)
+
+        self.setWindowTitle(self.title)
+        self.setGeometry(self.left,self.top,self.width,self.height)
+
+        self.triggerPanel = QGroupBox(self)
+        self.triggerPanelLayout = QGridLayout()
+        self.triggerPanelLayout.setVerticalSpacing(5)
+
+        self.triggerPanel.setLayout(self.triggerPanelLayout)
+        self.triggerPanel.move(0,0)
+        self.triggerPanel.resize(self.width,self.height)
+
+        #Trigger interface
+        row = 0
+
+        if NI_FLAG:
+            interfaceItems = ['Nidaq Board','Parallel Port']
+        else:
+            interfaceItems = ['Parallel Port']
+
+        self.triggerInterfaceLabel = QLabel('Interface')
+        self.triggerInterfaceLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.triggerInterface = QComboBox()
+        self.triggerInterface.addItems(interfaceItems)
+        self.triggerInterface.activated.connect(lambda: self.menuProc('triggerInterface',self.triggerInterface.currentText()))
+        self.triggerInterface.setFixedHeight(20)
+
+        self.triggerPanelLayout.addWidget(self.triggerInterfaceLabel,row,0)
+        self.triggerPanelLayout.addWidget(self.triggerInterface,row,1,1,1)
+
+        row += 1
+
+        
+        if NI_FLAG:
+            lineList = []
+            s = ni.system.System.local()
+
+            for device in s.devices:
+                lineList += [line.name for line in device.di_lines]
+
+            #Nidaq digital lines in
+            self.digitalLinesInLabel = QLabel('Digital In')
+            self.digitalLinesInLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+            self.digitalInLines = QComboBox()
+            self.digitalInLines.addItems(lineList)
+            self.digitalInLines.activated.connect(lambda: self.menuProc('digitalInLines',self.digitalInLines.currentText()))
+            self.digitalInLines.setFixedHeight(20)
+
+            self.triggerPanelLayout.addWidget(self.digitalLinesInLabel,row,0)
+            self.triggerPanelLayout.addWidget(self.digitalInLines,row,1,1,1)
+
+            row += 1
+
+            #Nidaq digital lines out
+            self.digitalLinesOutLabel = QLabel('Digital Out')
+            self.digitalLinesOutLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+            self.digitalOutLines = QComboBox()
+            self.digitalOutLines.addItems(lineList)
+            self.digitalOutLines.activated.connect(lambda: self.menuProc('digitalOutLines',self.digitalOutLines.currentText()))
+            self.digitalOutLines.setFixedHeight(20)
+
+            self.triggerPanelLayout.addWidget(self.digitalLinesOutLabel,row,0)
+            self.triggerPanelLayout.addWidget(self.digitalOutLines,row,1,1,1)
+
+            #reset the row counter
+            row = 1
+
+        #parallel port addresses
+        self.parallelPortAddressLabel = QLabel('Port Address')
+        self.parallelPortAddressLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.parallelPortAddress = QLineEdit()
+        self.parallelPortAddress.setAlignment(QtCore.Qt.AlignRight)
+        self.parallelPortAddress.setFixedWidth(80)
+        self.parallelPortAddress.editingFinished.connect(lambda: self.variableProc('parallelPortAddress',self.parallelPortAddress.text()))
+
+        self.triggerPanelLayout.addWidget(self.parallelPortAddressLabel,row,0)
+        self.triggerPanelLayout.addWidget(self.parallelPortAddress,row,1,1,1)
+
+        row += 1
+
+        #Input parallel port address and pin
+        self.inputTriggerLabel = QLabel('Pin In')
+        self.inputTriggerLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.inputTrigger = QComboBox()
+        self.inputTrigger.addItems(['0','1','2','3','4','5','6','7'])
+        self.inputTrigger.setFixedHeight(20)
+        self.inputTrigger.setFixedWidth(40)
+        self.inputTrigger.activated.connect(lambda: self.menuProc('inputTrigger',self.inputTrigger.currentText()))
+
+        self.triggerPanelLayout.addWidget(self.inputTriggerLabel,row,0)
+        self.triggerPanelLayout.addWidget(self.inputTrigger,row,1,1,1)
+
+        row += 1
+
+        #Output parallel port pin
+        self.outputTriggerLabel = QLabel('Pin Out')
+        self.outputTriggerLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
+        self.outputTrigger = QComboBox()
+        self.outputTrigger.addItems(['0','1','2','3','4','5','6','7'])
+        self.outputTrigger.setFixedHeight(20)
+        self.outputTrigger.setFixedWidth(40)
+        self.outputTrigger.activated.connect(lambda: self.menuProc('outputTrigger',self.outputTrigger.currentText()))
+
+        self.triggerPanelLayout.addWidget(self.outputTriggerLabel,row,0)
+        self.triggerPanelLayout.addWidget(self.outputTrigger,row,1,1,1)
+
+        row += 1
+
+        #insert variable height spacer at the bottom of the panel
+        self.rowSpacer = QLabel('',self)
+        self.triggerPanelLayout.addWidget(self.rowSpacer,row,0,1,2)
+        self.triggerPanelLayout.setRowStretch(5,2)
+        self.rowSpacer.setAlignment(QtCore.Qt.AlignVCenter)
+
+
+        #recall the settings from the global settings file
+        self.recallTriggerSettings()
+
+    #Set the triggers according to the global settings file
+    def recallTriggerSettings(self):
+        global globalSettings
+
+        interface = globalSettings['triggerInterface']
+
+        #if empty, set to first item in the list
+        if interface == '':
+            self.triggerInterface.setCurrentIndex(0)
+            interface = self.triggerInterface.currentText()
+            globalSettings['triggerInterface'] = interface
+        else:
+            self.triggerInterface.setCurrentText(interface)
+
+        if interface == 'Nidaq Board':
+            di = globalSettings['digitalIn']
+
+            if di == '':
+                self.digitalInLines.setCurrentIndex(0)
+                globalSettings['digitalIn'] = self.digitalInLines.currentText()
+            else:
+                self.digitalInLines.setCurrentText(globalSettings['digitalIn'])
+
+            do = globalSettings['digitalOut']
+            if do == '':
+                self.digitalOutLines.setCurrentIndex(0)
+                globalSettings['digitalOut'] = self.digitalOutLines.currentText()
+            else:
+                self.digitalOutLines.setCurrentText(globalSettings['digitalOut'])
+        elif interface == 'Parallel Port':
+            di = globalSettings['digitalIn']
+            if di == '':
+                self.inputTrigger.setCurrentIndex(0)
+                globalSettings['digitalIn'] = self.inputTrigger.currentText()
+            else:
+                self.inputTrigger.setCurrentText(globalSettings['digitalIn'])
+
+            do = globalSettings['digitalOut']
+            if do == '':
+                self.outputTrigger.setCurrentIndex(0)
+                globalSettings['digitalOut'] = self.outputTrigger.currentText()
+            else:
+                self.outputTrigger.setCurrentText(globalSettings['digitalOut'])
+
+            
+            self.parallelPortAddress.setText(str(globalSettings['parallelPortAddress']))
+            
+        #switch to the correct control set
+        self.switchControls(interface)
+
+    #Handles variable inputs for the trigger panel
+    def variableProc(self,controlName,entry):
+        global globalSettings
+        globalSettings['parallelPortAddress'] = entry
+
+        #auto save any changes to the global settings file
+        ex.saveGlobalSettings()
+
+    #Handles menu/combobox inputs for the trigger panel
+    def menuProc(self,controlName,selection):
+        global globalSettings
+
+        if controlName == 'triggerInterface':
+            self.switchControls(selection)
+            globalSettings['triggerInterface'] = self.triggerInterface.currentText()
+        elif controlName == 'inputTrigger':
+            globalSettings['digitalIn'] = self.inputTrigger.currentText()
+        elif controlName == 'outputTrigger':
+            globalSettings['digitalOut'] = self.outputTrigger.currentText()
+        elif controlName == 'digitalInLines':
+            globalSettings['digitalIn'] = self.digitalInLines.currentText()
+        elif controlName == 'digitalOutLines':
+            globalSettings['digitalOut'] = self.digitalOutLines.currentText()
+
+        #auto save any changes to the global settings file
+        ex.saveGlobalSettings()
+
+    #Switches the control set depending on the trigger interface
+    def switchControls(self,selection):
+        global globalSettings, NI_FLAG
+
+        if selection == 'Nidaq Board':
+            if(NI_FLAG):
+                self.digitalInLines.show()
+                self.digitalLinesInLabel.show()
+                self.digitalOutLines.show()
+                self.digitalLinesOutLabel.show()
+
+                self.inputTriggerLabel.hide()
+                self.inputTrigger.hide()
+                self.outputTrigger.hide()
+                self.outputTriggerLabel.hide()
+                self.parallelPortAddressLabel.hide()
+                self.parallelPortAddress.hide()
+
+                globalSettings['digitalIn'] = self.digitalInLines.currentText()
+                globalSettings['digitalOut'] = self.digitalOutLines.currentText()
+
+
+        elif selection == 'Parallel Port':
+            if NI_FLAG:
+                self.digitalInLines.hide()
+                self.digitalLinesInLabel.hide()
+                self.digitalOutLines.hide()
+                self.digitalLinesOutLabel.hide()
+
+            self.inputTriggerLabel.show()
+            self.inputTrigger.show()
+            self.outputTrigger.show()
+            self.outputTriggerLabel.show()
+            self.parallelPortAddressLabel.show()
+            self.parallelPortAddress.show()
+
+            globalSettings['digitalIn'] = self.inputTrigger.currentText()
+            globalSettings['digitalOut'] = self.outputTrigger.currentText()
+
+#Writes the stimulus dictionary to an HDF5 file that can be read from a shared folder
+def writeHDF5(stim,seqAssign,seqDict,trajDict,maskDict,stimName):
+
+    fileName = 'C:\\Users\\Owner\\Desktop\\StimulusData\\currentStimulus.h5'
+    h = h5py.File(fileName,'w')
+
+    g = h.create_group('StimGen')
+    
+    stimGroup = g.create_group('Stimulus')
+    seqGroup = g.create_group('Sequences')
+    seqAssignGroup = g.create_group('Sequence Assignments')
+    trajGroup = g.create_group('Trajectories')
+    maskGroup = g.create_group('Masks')
+
+    g.create_group('Timestamps')
+
+    a = stimGroup.attrs
+    a.create('Name',stimName)
+    a.create('Objects',len(stim))
+
+    for objName,obj in stim.items():
+        #each stimulus object gets its own group
+        objectGroup = stimGroup.create_group(str(objName))
+
+        objectAttr = objectGroup.attrs
+        #write the stimulus object attributes
+        for k,v in obj.items():
+            objectAttr.create(k,v)
+
+    a = seqGroup.attrs
+    for k,v in seqDict.items():
+        data = str(v)
+        a.create(k,data)
+
+    a = seqAssignGroup.attrs
+    for objName,obj in seqAssign.items():
+        #each stimulus object gets its own group
+        objectGroup = seqAssignGroup.create_group(str(objName))
+
+        objectAttr = objectGroup.attrs
+        #write the stimulus object attributes
+    
+        for k,v in obj.items():
+            key = str(v['parent'])
+            data = str(v['sequence'])    
+            objectAttr.create(key,data)
+
+    a = trajGroup.attrs
+    for k,v in trajDict.items():
+        data = str(v)
+        a.create(k,data)
+
+    h.close
+
+def writeTimestamps(group,timestamps):
+
+    #writes trigger timestamps to the current stimulus log file
+    fileName = 'C:\\Users\\Owner\\Desktop\\StimulusData\\currentStimulus.h5'
+    h = h5py.File(fileName,'r+')
+
+    g = h['StimGen/Timestamps']
+
+    timestamparray = np.array(timestamps)
+    g.create_dataset(group,data=timestamparray)
+    
+    h.close
 #Start the application
 if __name__ == '__main__':
-
 
     #scaling will transfer to lower res monitors
     QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True)
