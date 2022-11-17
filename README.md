@@ -13,4 +13,5 @@ Stimuli can be saved in a 'stimulus bank' so that they can be reused from sessio
 
 --------------------
 Install as a conda environment using the including environment file: environment.yml
+
 conda env create --name envname --file=environment.yml
