@@ -74,7 +74,7 @@ class App(QMainWindow):
         self.height = 780 * scale_h
 
         #path to the StimGen.py file
-        # basePath = 'C:/Users/jadob/Desktop/StimGenPy_WIN/StimGen/'
+        #basePath = 'C:/Users/jadob/Desktop/StimGenPy_WIN/StimGen/'
         basePath = '/Users/bmb/Documents/GitHub/StimGenPy_WIN/StimGen/'
         stimPath = basePath + 'stimuli/'
         imagePath = basePath + 'images/'
