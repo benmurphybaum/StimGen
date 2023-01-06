@@ -61,6 +61,8 @@ import platform
 #Motion Clouds
 import MotionClouds as mc
 
+import pathlib
+
 #Build the GUI
 class App(QMainWindow):
 
@@ -99,8 +101,10 @@ class App(QMainWindow):
 
         #path to the StimGen.py file
         # basePath = 'C:/Users/jadob/Desktop/StimGenPy_WIN/StimGen/'
-        basePath = '/Users/Owner/Desktop/StimGen/'
-        saveToPath = '/Users/Owner/Desktop/StimGen/StimulusLog/'
+        basePath = os.getcwd() + "/"
+        
+        # basePath = '/Users/Owner/Desktop/StimGen/'
+        saveToPath = basePath + 'StimulusLog/'
         stimPath = basePath + 'stimuli/'
         imagePath = basePath + 'images/'
         gammaPath = basePath + 'gamma/'
@@ -235,6 +239,7 @@ class App(QMainWindow):
         self.flipControls('objectType','Circle')
         self.flipControls('motionType','Static')
         self.flipControls('modulationType','Static')
+        self.flipControls('coordinateType','Cartesian')
         self.setDefaults()
 
         #Make first stimulus and sequence assignment dictionaries
@@ -5000,7 +5005,10 @@ class App(QMainWindow):
             'dotCoherence',
             'dotCoherenceLabel',
             'dotCoherenceSeq',
-            'PositionalShiftType'
+            'PositionalShiftType',
+            'TargetResolution',
+            'TargetResolutionLabel',
+            'TargetResolutionSeq'
         ]
 
         allMotionSettings = [
@@ -7727,6 +7735,7 @@ def writeTimestamps(group,timestamps):
     g.create_dataset(group,data=timestamparray)
     
     h.close
+
 #Start the application
 if __name__ == '__main__':
 
