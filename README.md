@@ -12,6 +12,6 @@ Users can design stimuli in sequences, such that single or multiple stimulus par
 Stimuli can be saved in a 'stimulus bank' so that they can be reused from session to session. 
 
 --------------------
-Install as a conda environment using the including environment file: environment.yml
+Install as a conda environment using the included environment file: environment.yml
 
 conda env create --name envname --file=environment.yml
