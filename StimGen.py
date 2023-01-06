@@ -33,8 +33,8 @@ from time import time
 # from nidaqmx import system
 
 #for browsing file explorer
-import tkinter
-from tkinter import filedialog, Tk
+import tkinter.filedialog
+from tkinter import Tk
 
 #for loading bitmap images
 from PIL import Image
@@ -773,9 +773,8 @@ class App(QMainWindow):
             self.removeMaskObject()
 
         elif controlName == 'stimPathBrowse':
-
             Tk().withdraw()
-            stimPath = tkinter.filedialog.askdirectory(initialdir = stimPath)
+            stimPath = filedialog.askdirectory(initialdir = stimPath)
             self.stimPath.setText(stimPath)
 
         elif controlName == 'saveToPathBrowse':
@@ -784,7 +783,7 @@ class App(QMainWindow):
             else:
                 startPath = saveToPath
             Tk().withdraw()
-            saveToPath = tkinter.filedialog.askdirectory(initialdir = startPath)
+            saveToPath = filedialog.askdirectory(initialdir = startPath)
             self.saveToPath.setText(saveToPath)
 
         elif controlName == 'batchStimAdd':
@@ -7667,7 +7666,7 @@ class triggerMenu(QMainWindow):
 #Writes the stimulus dictionary to an HDF5 file that can be read from a shared folder
 def writeHDF5(stim,seqAssign,seqDict,trajDict,maskDict,stimName):
 
-    fileName = 'C:\\Users\\Owner\\Desktop\\StimulusData\\currentStimulus.h5'
+    fileName = saveToPath +'currentStimulus.h5'
     h = h5py.File(fileName,'w')
 
     g = h.create_group('StimGen')
@@ -7721,7 +7720,7 @@ def writeHDF5(stim,seqAssign,seqDict,trajDict,maskDict,stimName):
 def writeTimestamps(group,timestamps):
 
     #writes trigger timestamps to the current stimulus log file
-    fileName = 'C:\\Users\\Owner\\Desktop\\StimulusData\\currentStimulus.h5'
+    fileName = saveToPath + 'currentStimulus.h5'
     h = h5py.File(fileName,'r+')
 
     g = h['StimGen/Timestamps']
