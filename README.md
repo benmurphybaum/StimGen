@@ -17,4 +17,3 @@ The stimulus information then gets saved into the same .h5 file that holds the a
 Install as a conda environment using the included environment file: environment.yml
 
 conda env create --name envname --file=environment.yml
-
