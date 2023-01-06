@@ -61,8 +61,6 @@ import platform
 #Motion Clouds
 import MotionClouds as mc
 
-import pathlib
-
 #Build the GUI
 class App(QMainWindow):
 
@@ -100,10 +98,7 @@ class App(QMainWindow):
         self.height = 780 * scale_h
 
         #path to the StimGen.py file
-        # basePath = 'C:/Users/jadob/Desktop/StimGenPy_WIN/StimGen/'
         basePath = os.getcwd() + "/"
-        
-        # basePath = '/Users/Owner/Desktop/StimGen/'
         saveToPath = basePath + 'StimulusLog/'
         stimPath = basePath + 'stimuli/'
         imagePath = basePath + 'images/'
