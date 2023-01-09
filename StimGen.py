@@ -1,36 +1,27 @@
 #StimGen python
 
-#import widgets
+# StimGen is a Qt-based python application for designing and presenting visual stimuli through a projector
+# or other external monitor. The interface is an arrangement of Qt widgets that set stimulus parameters such
+# as the type of object, and its size, orientation, motion, timing, etc. These parameters are all imported into a master
+# stimulus dictionary called 'stim', which is then recalled at runtime. Stimuli are generally produced frame-by-frame as 
+# they are presented, except for some cases where the entire stimulus is held in memory before-hand. Stimuli are
+# saved into a stimulus bank on disk, and is able to be recalled in future sessions.  
+
+
+#Qt widgets
 from PyQt5.QtWidgets import QApplication,QWidget,QMainWindow,QMenuBar,QMenu,QAction,QPushButton,QLineEdit,QGroupBox,QComboBox,QFrame,QAbstractItemView,QDesktopWidget
 from PyQt5.QtWidgets import QLabel,QListWidget,QListWidgetItem,QSpacerItem,QVBoxLayout,QGridLayout,QCheckBox,QInputDialog,QListView,QFontDialog,QErrorMessage
 from PyQt5 import QtCore,QtGui
 
-#triggers
+#PsychoPy - visual stimulus library
+from psychopy import visual, core, parallel, event, monitors
 
-global NI_FLAG 
-NI_FLAG = 0
-
-if NI_FLAG:
-    import nidaqmx as ni
-
-#from PyQt5.QtGui import QIcon, QPixmap
-
-#for stimulus centering
-# import keyboard
+#Motion Clouds - specialized visual stimulus library for generated natural scenes
+import MotionClouds as mc
 
 #timing libraries
 from time import sleep
 from time import time
-
-#for monitor specifications
-# from win32api import GetSystemMetrics
-
-#for plotting data
-#import matplotlib.pyplot as plt
-
-#triggers
-
-# from nidaqmx import system
 
 #for browsing file explorer
 import tkinter.filedialog
@@ -46,20 +37,24 @@ import os
 import h5py
 import csv
 
+import platform
+
+#math operations
 import numpy as np
 
+#random number generators
 from random import random, randint, seed
 
 #for copying dictionaries
 import copy
 
-#PsychoPy
-from psychopy import visual, core, parallel, event, monitors
+#triggers - set to 1 to import the nidaqmx library.
+global NI_FLAG 
+NI_FLAG = 0
 
-import platform
+if NI_FLAG:
+    import nidaqmx as ni
 
-#Motion Clouds
-import MotionClouds as mc
 
 #Build the GUI
 class App(QMainWindow):
@@ -70,13 +65,6 @@ class App(QMainWindow):
         global scale_w,scale_h,device,isOpen,centeringActive,subfolder,gammaTable
 
         super(App,self).__init__()
-
-        #monitor scale factor
-        # w = GetSystemMetrics(0)
-        # h = GetSystemMetrics(1)
-
-        # w = 2048
-        # h = 1536
 
         isOpen = 0 #stimulus window is closed
         centeringActive = 0
