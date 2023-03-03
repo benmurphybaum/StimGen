@@ -55,6 +55,8 @@ NI_FLAG = 0
 if NI_FLAG:
     import nidaqmx as ni
 
+global STIMGEN_FLAG
+STIMGEN_FLAG = 0
 
 #Build the GUI
 class App(QMainWindow):
@@ -2424,7 +2426,8 @@ class App(QMainWindow):
                         return
 
                     #writes the stimulus to an HDF5 file for retrieval by ScanImage and WaveSurfer/Turntable through the ethernet port
-                    writeHDF5(stim,seqAssign,seqDict,trajDict,maskDict,originalStimName)
+                    if STIMGEN_FLAG:
+                        writeHDF5(stim,seqAssign,seqDict,trajDict,maskDict,originalStimName)
 
                     #reset frame counts
                     frameCount = 0
@@ -2709,7 +2712,8 @@ class App(QMainWindow):
                                 startTime = time()
                             continue
                     
-                    writeTimestamps('Triggers',triggerTimeStamps)
+                    if STIMGEN_FLAG:
+                        writeTimestamps('Triggers',triggerTimeStamps)
 
                     #overall timer that is started before delay
                     totalTimer = 0
@@ -3171,7 +3175,9 @@ class App(QMainWindow):
                             objectON = -1
                             onTime = time() - startTime
                             objectTimeStamps.append(onTime)
-                            writeTimestamps('ON',objectTimeStamps)
+
+                            if STIMGEN_FLAG:
+                                writeTimestamps('ON',objectTimeStamps)
 
                         #Save the frames to disk
                         if exportStimulus == 1:
@@ -3193,7 +3199,8 @@ class App(QMainWindow):
                     win.flip()
 
                     #Save the frame time stamps to the stimulus log file
-                    writeTimestamps('Frames',frameTimeStamps)
+                    if STIMGEN_FLAG:
+                        writeTimestamps('Frames',frameTimeStamps)
 
                     self.stimCountDown.setText('')
                     self.sweepMonitor.setText('')
